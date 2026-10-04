@@ -8,6 +8,10 @@ export const TOPICS={
   'Food & drinks':/\b(food|drinks?|coffee|dinner|lunch|breakfast|brunch|pizza|refreshments|boba|beer|wine|cocktails?|tasting)\b/i
 };
 export const zone='America/Los_Angeles';
+export function timeContext(now=Date.now()){
+  const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
+  return hour>=5&&hour<12?'this morning':hour>=12&&hour<17?'this afternoon':'tonight';
+}
 export function dateKey(date) {return new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(date));}
 export function classify(event) {const text=[event.title,event.description,...(event.tags||[])].join(' ');return Object.keys(TOPICS).filter(k=>TOPICS[k].test(text));}
 export function safeURL(value) {try{const u=new URL(value);return u.protocol==='https:'?u.href:'';}catch{return '';}}

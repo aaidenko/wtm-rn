@@ -1,4 +1,4 @@
-import {TOPICS,dateKey,zone,normalize,select,eventOnDay,stanfordTime,stanfordLocalTime,planTimes,safeURL} from './model.mjs';
+import {TOPICS,dateKey,zone,normalize,select,eventOnDay,stanfordTime,stanfordLocalTime,planTimes,timeContext,safeURL} from './model.mjs';
 const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
@@ -30,17 +30,12 @@ function render(){
   const shortlist=select(events,{saved:state.saved,source:'saved',matched:false,region:'all',sort:'time',today:state.today});
   $('moves-nav-count').textContent=shortlist.length;
   document.querySelectorAll('[data-section]').forEach(b=>{const active=b.dataset.section===state.section;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
-  $('hero-eyebrow').textContent=moving?'THE PLANS YOU’VE PICKED.':'LESS SCROLLING. MORE SHOWING UP.';
-  $('hero-title').innerHTML=moving?'Your <em>moves.</em>':'What’s the <em>move?</em>';
-  $('hero-intro').textContent=moving?'The group’s saved talks, meetups, and plans. See who’s going.':'Free events for Stanford students. Find something worth showing up for.';
-  $('hero-note').innerHTML=moving?`<span>YOUR WEEK, SORTED</span><strong>${shortlist.length} saved ${shortlist.length===1?'move.':'moves.'}</strong><p>Pick a plan. See who’s going.</p><div class="spark">★</div>`:'<span>YOUR KIND OF CAMPUS</span><strong>Big ideas.<br>Small group chats.</strong><p>Startups, CS, AI & everything after.</p><div class="spark">↗</div>';
   $('moves-preview').hidden=moving||!ready;
   $('moves-preview-empty').hidden=!!shortlist.length;
   $('moves-preview-events').innerHTML=shortlist.slice(0,3).map(e=>`<button class="move-tile" data-move-detail="${escape(e.id)}"><span>${escape(shortDate(e.start))} · ${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}</span><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}</span><span>${escape(goingLabel(e))}</span></button>`).join('');
   $('moves-preview-events').querySelectorAll('[data-move-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.moveDetail));
   $('moves-note').hidden=!moving;
   $('filters-panel').hidden=moving;
-  $('hero-title').closest('.hero').classList.toggle('moves-hero',moving);
   $('identity').hidden=!ready; $('identity').textContent=member||'Your name';
   $('import-saves').hidden=!moving||read('wtm-saves-shared',false)||!events.some(e=>legacySaves.includes(e.id)&&!e.groupSaved);
   const filters=moving?{...state,source:'saved',matched:false,sort:'time'}:state;
@@ -49,7 +44,7 @@ function render(){
   $('sort').hidden=state.view==='calendar';
   document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===state.view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   $('cards').className=state.view==='cards'?'cards':state.view==='calendar'?'calendar':'event-list';
-  $('heading').textContent=state.source==='friends'?'From the group chat':moving?'Your Moves':state.region==='sf'?'Around San Francisco':'Your next move';
+  $('heading').textContent=state.source==='friends'?'Friends’ plans':moving?'Your Moves':state.region==='sf'?'SF events':'Events';
   $('count').textContent=`${list.length} ${list.length===1?'plan':'plans'} · Stanford time`;
   if(!list.length&&state.view!=='calendar'){$('cards').innerHTML=moving?'<div class="empty"><strong>The group’s next move starts with a ☆.</strong>Save events in Discover for everyone, then mark Going.<br>If you’ve saved something already, try This week or Everywhere.</div>':'<div class="empty"><strong>No moves here yet.</strong>Try This week, clear your search, or turn off “My interests only”.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
   if(state.view==='list') {
@@ -195,6 +190,7 @@ $('search').oninput=e=>{state.search=e.target.value;render();};
 for(const id of ['matched'])$(id).onchange=e=>{state[id]=e.target.checked;render();};
 $('sort').onchange=e=>{state.sort=e.target.value;render();};
 $("filters-panel").open=!matchMedia("(max-width:650px)").matches;
-dates();topics();planTags();load();
+function updateTimeContext(){$('time-context').textContent=timeContext();}
+updateTimeContext();dates();topics();planTags();load();
 setInterval(()=>{if(ready&&!document.querySelector('dialog[open]'))load();},30000);
-setInterval(()=>{const today=dateKey(Date.now());if(today!==state.today){state.today=today;state.day=today;dates();load();}},60000);
+setInterval(()=>{updateTimeContext();const today=dateKey(Date.now());if(today!==state.today){state.today=today;state.day=today;dates();load();}},60000);
