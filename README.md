@@ -11,7 +11,7 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 ## Browse events
 
 - Discover: browse free events with interest and location filters.
-- Your Moves: a prominent separate section for saved events, ordered by time. Interest filters never hide saved picks. A shortlist preview appears above discovery filters. Saves are on the current device.
+- Your Moves: shared group saves in Neon, ordered by time. Anyone can save/remove a group move. Names beside each event show who marked Going. Each person can change only their own RSVP; a signed browser identity remembers their chosen name. Names are self reported. Interest filters never hide group moves. Previous private saves can be shared with the import button. The page checks for group changes every 30 seconds.
 - List: compact rows, with event details on click.
 - Calendar: seven days, with events ordered by time within each day. Swipe across days on a phone.
 - Cards: images and event descriptions.
@@ -19,7 +19,7 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 - Today, Tomorrow and This week; interest filters, search, free admission enforced across all views, and saved events.
 - Mobile filters collapse to leave more room for events.
 
-Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Saved events and interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
+Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group events and RSVPs are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
 
 ## Add calendars
 
@@ -46,11 +46,23 @@ Manage calendars → Discovery sources & newsletters shows the source directory.
 - ASES website and join form: https://ases.stanford.edu/
 - AI Club example and speaker host calendar: https://luma.com/r01e3zn0
 
-Mailing-list emails are **not scanned**. Joining a list does not make its messages public. Reading those announcements requires a connected inbox or a dedicated mailbox/forwarding workflow. Paste a Luma event from an announcement into Manage calendars to recheck that event daily. No email subscriptions or messages were sent on your behalf. Partiful links remain manual plans.
+Optional dedicated Gmail scanning is implemented but **not connected until credentials are set**. Joining a list does not make its messages public. Paste a Luma event from an announcement into Manage calendars to recheck that event daily. No email subscriptions or messages were sent on your behalf. Partiful links remain manual plans.
+
+## Connect a free dedicated Gmail inbox
+
+1. Create a personal Gmail account just for WTM. Subscribe it to club lists, or forward announcements from your Stanford mailbox when a list requires a Stanford address.
+2. Turn on Google 2-Step Verification and create an app password named WTM: https://myaccount.google.com/apppasswords . Some account types do not offer app passwords.
+3. In the WTM Vercel project's Production environment variables, set `WTM_INBOX_EMAIL` to that Gmail address and `WTM_INBOX_APP_PASSWORD` to the generated app password. Mark the password Sensitive. Do not paste it into chat or commit it. Redeploy to apply changes.
+4. Vercel's existing daily refresh opens INBOX read-only over TLS, scans up to 50 messages from the past 14 days (maximum 256 KiB per message), extracts direct Luma links, and verifies public event registration. No emails are sent, deleted, marked read or displayed to the group. The app password itself grants broader mailbox access than these read-only operations; use the dedicated account.
+5. Only confirmed free, student-accessible events appear. Existing discovered links are retained and rechecked; duplicate calendar events are merged. Plain-text announcements with no direct Luma link, tracking-only links, and Partiful invitations currently need manual entry. No paid AI parser is used.
+
+Inbox credentials are server-only. Without them, email scanning stays off and calendars continue normally. Settings show the last inbox scan or a connection error. A successful live inbox scan cannot be tested until the dedicated account is connected.
+
+References: [Google app passwords](https://support.google.com/accounts/answer/185833), [Gmail clients and IMAP](https://support.google.com/mail/answer/7126229).
 
 ## Git workflow
 
-Commit and push each completed code change after appropriate checks. Secrets, build outputs and preview data remain ignored. The local repository still needs a connected Git host and remote repository before pushes can succeed.
+Commit and push each completed code change after appropriate checks. Secrets, build outputs and preview data remain ignored. Repository: https://github.com/aaidenko/wtm-rn (private). Push completed changes to origin/main.
 
 ## Daily updates
 
