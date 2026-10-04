@@ -110,7 +110,7 @@ WTM has a cloud-only iMessage agent: Photon hosts messaging, Vercel receives sig
 To activate:
 
 1. Create a free Photon project at https://photon.codes, enable its shared iMessage line and add your test users. Get the Stable project ID and project secret (not a local server token).
-2. Set `SPECTRUM_PROJECT_ID` and `SPECTRUM_PROJECT_SECRET` as production Vercel environment variables. Set `GEMINI_API_KEY` from https://aistudio.google.com/api-keys. The default model is `gemini-2.5-flash-lite`; `GEMINI_MODEL` can override it.
+2. Set `SPECTRUM_PROJECT_ID` and `SPECTRUM_PROJECT_SECRET` as production Vercel environment variables. Set `GEMINI_API_KEY` from https://aistudio.google.com/api-keys. The default model is `gemini-3.5-flash-lite`; `GEMINI_MODEL` can override it.
 3. Register `https://wtm-rn.vercel.app/api/photon` as a native Spectrum webhook. The Stable registration API is `POST https://spectrum.photon.codes/projects/{projectId}/webhooks/`, HTTP Basic auth with project ID and project secret, JSON body `{"webhookUrl":"https://wtm-rn.vercel.app/api/photon"}`. The response returns `data.signingSecret` once: save it directly as `SPECTRUM_WEBHOOK_SECRET`. Never paste credentials into chat, source code or a URL.
 4. Redeploy after saving environment variables. Open https://wtm-rn.vercel.app/agent.html, enter your WTM name, generate a one-use 10-minute link code, and text the displayed command to your assigned Photon iMessage contact. The contact is assigned through Photon; WTM does not provision or initiate unsolicited conversations.
 

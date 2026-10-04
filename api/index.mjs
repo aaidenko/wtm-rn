@@ -87,7 +87,7 @@ export default async function handler(req,res) {
     if(path==='photon-setup'&&req.method==='POST'){
       if(!process.env.CRON_SECRET||!eq(req.headers.authorization,`Bearer ${process.env.CRON_SECRET}`))return send({error:'Unauthorized'},401);
       if(req.body?.action==='test-model'){
-        try{const intent=await interpret('AI events tomorrow',{events:[]});return send({ok:true,model:process.env.GEMINI_MODEL||'gemini-2.5-flash-lite',intent});}
+        try{const intent=await interpret('AI events tomorrow',{events:[]});return send({ok:true,model:process.env.GEMINI_MODEL||'gemini-3.5-flash-lite',intent});}
         catch(e){return send({ok:false,providerStatus:e.providerStatus||null,diagnostic:e.providerDiagnostic||e.message});}
       }
       try{return send(await registerPhoton());}catch(e){return send({error:e.message},409);}

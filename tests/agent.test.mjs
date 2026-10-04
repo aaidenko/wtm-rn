@@ -29,11 +29,11 @@ test('Search uses Pacific days and excludes paid, inaccessible and wrong region 
  assert.deepEqual(findEvents(all,base,now).map(e=>e.id),['one']);assert.deepEqual(findEvents(all,{...base,day:'2026-12-01'},now),[]);
 });
 test('Model results are validated and private context is omitted from the request',async()=>{
- let request;
- const result=await interpret('AI events tomorrow',{events,last:['one'],now},{GEMINI_API_KEY:'fake'},async(url,opts)=>{request=JSON.parse(opts.body);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:JSON.stringify(base)}]}}]})};});
- assert.equal(result.action,'find');assert.equal(request.generationConfig.responseMimeType,'application/json');assert.equal(JSON.stringify(request).includes('fake'),false);
+ let request,modelURL;
+ const result=await interpret('AI events tomorrow',{events,last:['one'],now},{GEMINI_API_KEY:'fake'},async(url,opts)=>{modelURL=url;request=JSON.parse(opts.body);return {ok:true,json:async()=>({candidates:[{content:{parts:[{text:JSON.stringify(base)}]}}]})};});
+ assert.equal(result.action,'find');assert.match(modelURL,/models\/gemini-3\.5-flash-lite:generateContent$/);assert.equal(request.generationConfig.responseMimeType,'application/json');assert.equal(JSON.stringify(request).includes('fake'),false);
  assert.throws(()=>validateIntent({...base,action:'delete'}));assert.throws(()=>validateIntent({...base,region:'elsewhere'}));
- await assert.rejects(()=>interpret('something',{events,now},{GEMINI_API_KEY:'fake'},async()=>({ok:false,status:429})),/quota/);
+ await assert.rejects(()=>interpret('something',{events,now},{GEMINI_API_KEY:'fake'},async()=>({ok:false,status:429,json:async()=>({error:{message:'Quota exhausted'}})})),/quota/);
 });
 test('Basic commands work without a model subscription or API key',async()=>{
  assert.equal((await interpret('save 1',{events,last:['one'],now},{},()=>{throw new Error('unexpected API call');})).action,'save');
@@ -79,4 +79,9 @@ test('A failed reply retries its stored answer without repeating the website mut
  await processJob('job',{sql,send:async()=>{throw new Error('network');}});assert.equal(state.status,'failed');
  await processJob('job',{sql,send:async(payload,reply)=>state.sent.push(reply)});
  assert.equal(state.status,'sent');assert.equal(state.writes.length,1);assert.equal(state.sent.length,1);
+});
+
+test('Provider diagnostics retain the failure status and redact API keys',async()=>{
+ const key='AIza-secret-test';
+ await assert.rejects(()=>interpret('AI tomorrow',{events,now},{GEMINI_API_KEY:key},async()=>({ok:false,status:403,json:async()=>({error:{message:'Invalid key '+key}})})),error=>error.providerStatus===403&&!error.providerDiagnostic.includes(key)&&error.providerDiagnostic.includes('[redacted]'));
 });
