@@ -72,6 +72,10 @@ References: [Google app passwords](https://support.google.com/accounts/answer/18
 
 Commit and push each completed code change after appropriate checks. Secrets, build outputs and preview data remain ignored. Repository: https://github.com/aaidenko/wtm-rn (private). Push completed changes to origin/main.
 
+Vercel is connected to this repository. Pushes to main trigger automatic production builds and deployment to https://wtm-rn.vercel.app . Verify the deployment for the pushed commit is READY before reporting a live update; routine changes do not require a separate manual deployment. Gmail credentials remain server-only in Vercel.
+
+Friend plans can span multiple days within the next 90 days. Their end must be after the start and still in the future. Calendar day filters include every date the plan overlaps; an end at midnight does not occupy the following day. Form errors identify the invalid field, and date/time inputs use Stanford time.
+
 ## Daily updates
 
 Vercel runs `/api/refresh` once daily at 14:17 UTC: 7:17 a.m. PDT / 6:17 a.m. PST. On Hobby, invocation can occur anywhere within that hour. The job runs on the production deployment, independently of your computer.

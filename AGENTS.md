@@ -2,6 +2,8 @@
 
 The owner requests that every completed code change be committed and pushed to the connected Git remote after appropriate checks. Keep commits scoped to finished changes. If authentication or the remote is missing, commit locally and clearly report that pushing remains blocked; never claim a successful push without verifying it. Never force-push unless explicitly authorized.
 
+Vercel is connected to the private aaidenko/wtm-rn GitHub repository. Push completed changes to main and let Vercel deploy automatically. Verify the deployment for that commit succeeds before reporting the change as live. Use a manual Vercel deployment only if the Git integration fails or a configuration change requires redeployment.
+
 Do not commit credentials, invite codes, environment files, preview data, or generated build outputs. WTM must stay on free services. Show only events with confirmed free admission and eligibility for Stanford students; do not infer free admission from food or an omitted price. Label host approval and other registration conditions.
 
 The owner authorizes subscribing WTM to relevant free event mailing lists whenever a new mailing-list source is added. Use wtminbox@gmail.com as the default recipient. Submit official newsletter forms when their requirements can be satisfied, avoid duplicate signups, and record whether the submission succeeded or still needs confirmation. Ask for missing required personal details; do not invent them or submit program applications as newsletter signups. CAPTCHA and inbox confirmation steps may require the owner. This instruction authorizes subscription requests, not unrelated messages or paid memberships. Adding a calendar alone is not a mailing-list subscription.
