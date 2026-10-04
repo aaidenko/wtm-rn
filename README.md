@@ -33,6 +33,8 @@ Stanford and Outlook: copy the calendar's iCal subscription URL.
 
 Use public community calendars. Imported event details are visible to everyone with the group code.
 
+Stanford calendar entries with unknown admission and a student-accessible audience also have their official event page checked for the explicit **Free Event** ticket label. This handles listings whose API free flag disagrees with the website; listed prices are never overridden. Page checks use six workers with a 30-second deadline, and failed checks stay hidden.
+
 Defaults: Stanford's central events calendar; the AI Club speaker host's public Luma calendar (found through the Alfred Lin event); BASES; SAGA's public Google calendar; HAI's department iCal calendar; Stanford xBuilders; and Luma SF Discover. ASES' public website is checked daily for linked Luma events. AI Club events by other hosts may require adding another calendar or an event link. HAI and SAGA items with no admission evidence remain hidden until confirmed. Stanford xBuilders had no upcoming events when checked on October 3, 2026. Luma's SF Discover feed can include nearby Bay Area events; SF is the feed category, not a guarantee that every venue is within city limits.
 
 Partiful is supported through friends submitting event links and the visible event details. WTM does not scan signed-in Partiful accounts or automatically refresh manually entered Partiful plans. Remove and repost a plan when its details change.

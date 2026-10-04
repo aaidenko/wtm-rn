@@ -26,6 +26,7 @@ export function normalize(data) {
       const id=`stanford:${e.id}:${t.id||t.start}`;if(seen.has(id))continue;seen.add(id);
       const tags=Object.values(e.filters||{}).flat().map(f=>f.name).filter(Boolean);
       const eligible=admission(e.description_text||'',e.ticket_cost,e.free);
+      if(eligible.free&&e.wtm_free_evidence)eligible.freeEvidence=e.wtm_free_evidence;
       const access=studentAccess(e.description_text||'',{audiences:(e.filters?.event_audience||[]).map(a=>a.name)});
       const department=(e.departments||[]).find(d=>/Human-Centered|Computer Science|HAI/i.test(d.name));
       result.push({id,title:e.title,description:e.description_text||'',location:e.location_name||e.location||'See event page',start:t.start,end:t.end,allDay:!!t.all_day,...eligible,...access,url:safeURL(e.localist_url),image:safeURL(e.photo_url),tags,source:'campus',region:'campus',sourceName:department?.name||'Stanford Events',price:e.ticket_cost||''});
