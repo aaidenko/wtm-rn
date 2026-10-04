@@ -36,8 +36,8 @@ export function select(events,{day='week',today=dateKey(Date.now()),interests=Ob
     if(e.free!==true||e.accessible!==true)return false;
     const eventDay=dateKey(e.start),end=e.end?Date.parse(e.end):Date.parse(e.start)+(e.allDay?86400000:7200000);
     if(end<now && !(e.allDay&&eventDay===today))return false;
-    if(day!=='week'&&eventDay!==day)return false;
-    if(day==='week'&&(eventDay<today||Date.parse(e.start)>now+7*86400000))return false;
+    if(day!=='week'&&!eventOnDay(e,day))return false;
+    if(day==='week'&&(dateKey(Math.max(Date.parse(e.start),end-1))<today||Date.parse(e.start)>now+7*86400000))return false;
     if(source==='saved'&&!saved.includes(e.id))return false;
     if(region!=='all'&&(e.region||'campus')!==region)return false;
     if(source==='campus'&&e.source==='friends')return false;
@@ -53,6 +53,11 @@ export function select(events,{day='week',today=dateKey(Date.now()),interests=Ob
     return Date.parse(a.start)-Date.parse(b.start);
   });
 }
+export function eventOnDay(event,day){
+  const start=Date.parse(event.start),parsedEnd=Date.parse(event.end);
+  const end=Number.isFinite(parsedEnd)&&parsedEnd>start?parsedEnd:start+(event.allDay?86400000:7200000);
+  return dateKey(start)<=day&&dateKey(end-1)>=day;
+}
 export function stanfordTime(value) {
   // Convert datetime-local in Stanford's timezone, independent of the viewer's timezone.
   const guess=Date.parse(value+'Z');if(!Number.isFinite(guess))throw new Error('Choose a valid time.');
@@ -64,4 +69,19 @@ export function stanfordTime(value) {
     const delta=guess-local;if(delta===0)return new Date(utc).toISOString();utc+=delta;
   }
   throw new Error('That time falls in a daylight-saving clock change. Choose another time.');
+}
+export function planTimes(startValue,endValue,now=Date.now()) {
+  const start=Date.parse(startValue),end=Date.parse(endValue);
+  if(!Number.isFinite(start))throw new Error('Choose a valid start date and time.');
+  if(!Number.isFinite(end))throw new Error('Choose a valid end date and time.');
+  if(start<now-3600000)throw new Error('The start time is in the past. Choose a future start, or one within the past hour for a plan already underway.');
+  if(start>now+90*86400000)throw new Error('Choose a start date within the next 90 days.');
+  if(end<=start)throw new Error('The end must be after the start. For a plan past midnight, choose the next day as the end date.');
+  if(end<=now)throw new Error('This plan has already ended. Choose an end time in the future.');
+  if(end>now+90*86400000)throw new Error('Choose an end date within the next 90 days.');
+  return {start:new Date(start).toISOString(),end:new Date(end).toISOString()};
+}
+export function stanfordLocalTime(value) {
+  const p=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:zone,year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hourCycle:'h23'}).formatToParts(new Date(value)).map(x=>[x.type,x.value]));
+  return `${p.year}-${p.month}-${p.day}T${p.hour}:${p.minute}`;
 }

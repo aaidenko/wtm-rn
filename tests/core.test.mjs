@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {validatePlan,parseFeed,collect,validateCalendar} from '../lib/core.mjs';
-import {classify,select,stanfordTime,dateKey,normalize} from '../public/model.mjs';
+import {classify,select,stanfordTime,stanfordLocalTime,planTimes,eventOnDay,dateKey,normalize} from '../public/model.mjs';
 const now=Date.parse('2026-10-03T19:00:00Z');
 test('interest classification avoids AI and CS substrings',()=>{
   assert.deepEqual(classify({title:'Fair paintings and classics'}),[]);
@@ -20,6 +20,23 @@ test('plans reject unsafe links, backwards times and oversized content',()=>{
   assert.throws(()=>validatePlan({...p,url:'javascript:alert(1)'},now));
   assert.throws(()=>validatePlan({...p,end:p.start},now));
   assert.throws(()=>validatePlan({...p,title:'x'.repeat(121)},now));
+});
+test('multi-day plans accept the October 17–18 range and appear on both dates',()=>{
+ const start=stanfordTime('2026-10-17T00:00'),end=stanfordTime('2026-10-18T23:59');
+ assert.deepEqual(planTimes(start,end,now),{start,end});
+ const e={title:'Weekend plan',description:'',location:'Campus',start,end,source:'friends',topics:[],free:true,accessible:true};
+ assert.equal(eventOnDay(e,'2026-10-17'),true);assert.equal(eventOnDay(e,'2026-10-18'),true);assert.equal(eventOnDay(e,'2026-10-19'),false);
+ assert.equal(select([e],{day:'2026-10-18',now,matched:false}).length,1);
+ assert.equal(select([e],{day:'week',today:'2026-10-18',now:Date.parse(stanfordTime('2026-10-18T10:00')),matched:false}).length,1);
+ assert.equal(eventOnDay({...e,end:stanfordTime('2026-10-18T00:00')},'2026-10-18'),false);
+});
+test('plan date errors identify the field and defaults use Stanford time',()=>{
+ assert.throws(()=>planTimes('invalid','2026-10-05T00:00:00Z',now),/valid start/);
+ assert.throws(()=>planTimes('2026-10-05T00:00:00Z','invalid',now),/valid end/);
+ assert.throws(()=>planTimes('2026-10-01T00:00:00Z','2026-10-05T00:00:00Z',now),/start time is in the past/);
+ assert.throws(()=>planTimes('2026-10-05T00:00:00Z','2026-10-04T00:00:00Z',now),/end must be after/);
+ assert.throws(()=>planTimes('2026-10-03T18:30:00Z','2026-10-03T18:45:00Z',now),/already ended/);
+ assert.equal(stanfordLocalTime('2026-10-18T07:00:00Z'),'2026-10-18T00:00');
 });
 test('iCal feed handles folded text, timezones, recurrence and cancellations',()=>{
   const ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nBEGIN:VEVENT\r\nUID:1\r\nDTSTART:20261003T220000Z\r\nDTEND:20261003T230000Z\r\nSUMMARY:AI builders\r\nDESCRIPTION:Hello\\,\r\n+ friends\r\nURL:https://luma.com/example\r\nRRULE:FREQ=DAILY;COUNT=2\r\nEND:VEVENT\r\nBEGIN:VEVENT\r\nUID:2\r\nDTSTART:20261003T220000Z\r\nDTEND:20261003T230000Z\r\nSUMMARY:Canceled\r\nSTATUS:CANCELLED\r\nEND:VEVENT\r\nEND:VCALENDAR'.replace('\r\n+ ','\r\n ');

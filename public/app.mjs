@@ -1,4 +1,4 @@
-import {TOPICS,dateKey,zone,normalize,select,stanfordTime,safeURL} from './model.mjs';
+import {TOPICS,dateKey,zone,normalize,select,eventOnDay,stanfordTime,stanfordLocalTime,planTimes,safeURL} from './model.mjs';
 const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
@@ -57,12 +57,12 @@ function render(){
     const start=stanfordTime((state.day==='week'?state.today:state.day)+'T12:00');
     const days=Array.from({length:7},(_,i)=>dateKey(Date.parse(start)+i*86400000));
     $('cards').innerHTML=`<div class="calendar-scroll"><div class="calendar-grid">${days.map(day=>{
-      const entries=list.filter(e=>dateKey(e.start)===day).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
-      return `<section class="calendar-day ${day===state.today?'is-today':''}"><div class="calendar-day-heading"><strong>${escape(shortDate(stanfordTime(day+'T12:00')))}</strong><span>${entries.length} ${entries.length===1?'event':'events'}</span></div>${entries.length?entries.map(e=>`<button class="calendar-event topic-${Object.keys(TOPICS).indexOf(e.topics[0])}" data-detail="${escape(e.id)}"><span class="calendar-time">${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}${e.approvalRequired?' · Approval':''}</span><strong>${escape(e.title)}</strong><span class="calendar-location">${escape(e.location)}</span><span class="calendar-source">${escape(e.sourceName||e.source)}${e.groupSaved?' · '+escape(goingLabel(e)):''}${e.topics[0]?' · '+escape(e.topics[0]):''}</span></button>`).join(''):'<p class="calendar-none">No matching events</p>'}</section>`;
+      const entries=list.filter(e=>eventOnDay(e,day)).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+      return `<section class="calendar-day ${day===state.today?'is-today':''}"><div class="calendar-day-heading"><strong>${escape(shortDate(stanfordTime(day+'T12:00')))}</strong><span>${entries.length} ${entries.length===1?'event':'events'}</span></div>${entries.length?entries.map(e=>`<button class="calendar-event topic-${Object.keys(TOPICS).indexOf(e.topics[0])}" data-detail="${escape(e.id)}"><span class="calendar-time">${escape(e.timeTBD?'Time TBD':dateKey(e.start)<day?'Continues'+(e.end&&dateKey(e.end)===day?' · until '+time(e.end):''):e.allDay?'All day':time(e.start))}${e.approvalRequired?' · Approval':''}</span><strong>${escape(e.title)}</strong><span class="calendar-location">${escape(e.location)}</span><span class="calendar-source">${escape(e.sourceName||e.source)}${e.groupSaved?' · '+escape(goingLabel(e)):''}${e.topics[0]?' · '+escape(e.topics[0]):''}</span></button>`).join(''):'<p class="calendar-none">No matching events</p>'}</section>`;
     }).join('')}</div></div><p class="calendar-help">Select an event for details. On your phone, swipe across the days. All times are at Stanford.</p>`;
   } else $('cards').innerHTML=list.map(e=>{
     const matched=e.topics.filter(t=>state.interests.includes(t));
-    const when=(state.day==='week'?shortDate(e.start)+' · ':'')+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''));
+    const when=(state.day==='week'?shortDate(e.start)+' · ':'')+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+(dateKey(e.start)!==dateKey(e.end)?shortDate(e.end)+' · ':'')+time(e.end):''));
     const source=e.source==='friends'?'FRIENDS':e.source==='luma'?'LUMA':e.source==='calendar'?'CALENDAR':'STANFORD';
     const link=e.url?`<a href="${escape(e.url)}" target="_blank" rel="noopener noreferrer">${e.source==='friends'?'Event link':e.source==='luma'?'Details & RSVP':'Details & registration'} ↗</a>`:'<span>Ask the host for details</span>';
     return `<article class="card"><div class="card-top ${e.image?'':'placeholder'}">${e.image?`<img src="${escape(e.image)}" alt="" loading="lazy">`:escape(e.source==='friends'?'Your people.':e.topics[0]||'Good plans.')}<span class="source-badge">${source}</span><button class="save" data-save="${escape(e.id)}" aria-label="${state.saved.includes(e.id)?'Remove from group':'Save to group'} ${escape(e.title)}" aria-pressed="${state.saved.includes(e.id)}">${state.saved.includes(e.id)?'★':'☆'}</button></div><div class="card-body"><div class="when">${escape(when)}</div><h3>${escape(e.title)}</h3><div class="location">⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</div><p class="description">${escape(e.description.slice(0,175))}${e.description.length>175?'…':''}</p><div class="tags" aria-label="Matching interests">${(matched.length?matched:e.topics).map(t=>`<span>${escape(t)}</span>`).join('')}${e.source==='friends'&&!e.topics.length?'<span>Hangout</span>':''}</div><div class="card-bottom">${link}<span class="price">${e.free?'Free entry':escape(e.price||'Cost not listed')}</span></div>${e.groupSaved?`<div class="card-bottom group-rsvp">${goingControl(e)}</div>`:''}${e.source==='friends'?`<div class="card-bottom"><span>Shared by ${escape(e.host)}</span><button class="remove" data-remove="${escape(e.id)}">Remove plan</button></div>`:''}</div></article>`;
@@ -116,7 +116,7 @@ function showDetail(id){
   const e=events.find(e=>e.id===id);if(!e)return;
   $('detail-source').textContent=e.sourceName||e.source;
   $('detail-title').textContent=e.title;
-  $('detail-when').textContent=shortDate(e.start)+' · '+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''))+' · Stanford time';
+  $('detail-when').textContent=shortDate(e.start)+' · '+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+(dateKey(e.start)!==dateKey(e.end)?shortDate(e.end)+' · ':'')+time(e.end):''))+' · Stanford time';
   $('detail-location').textContent='⌖ '+e.location;
   $('detail-eligibility').textContent='Free admission · '+e.access+' · '+e.freeEvidence;
   $('detail-tags').innerHTML=e.topics.map(t=>`<span>${escape(t)}</span>`).join('');
@@ -156,14 +156,14 @@ async function load(){
 $('login-form').onsubmit=async e=>{e.preventDefault();try{await api('session','POST',{code:new FormData(e.target).get('code')});$('login-error').textContent='';await load();}catch(error){$('login-error').textContent=error.message;}};
 $('login').addEventListener('cancel',e=>e.preventDefault());
 $('logout').onclick=async()=>{try{await api('logout','POST');events=[];member=null;state.saved=[];ready=false;render();$('cards').replaceChildren();$('logout').hidden=true;await load();}catch(e){toast(e.message);}};
-$('add').onclick=()=>{if(!ready){toast('Join your group before posting a plan.');return;}$('plan-form').elements.region.value=state.region==='sf'?'sf':'campus';$('plan-dialog').showModal();};
+$('add').onclick=()=>{if(!ready){toast('Join your group before posting a plan.');return;}const form=$('plan-form');form.elements.region.value=state.region==='sf'?'sf':'campus';if(!form.elements.start.value){const start=Math.ceil((Date.now()+60000)/900000)*900000;form.elements.start.value=stanfordLocalTime(start);form.elements.end.value=stanfordLocalTime(start+2*3600000);}$('plan-error').textContent='';$('plan-dialog').showModal();};
 $('close-plan').onclick=()=>$('plan-dialog').close();
 function planTags(){const names=[...Object.keys(TOPICS),'Hangout'];$('plan-tags').innerHTML=names.map(t=>`<button type="button" data-tag="${escape(t)}" class="chip ${tagSelection.includes(t)?'active':''}">${escape(t)}</button>`).join('');$('plan-tags').querySelectorAll('button').forEach(b=>b.onclick=()=>{const t=b.dataset.tag;tagSelection=tagSelection.includes(t)?tagSelection.filter(x=>x!==t):[...tagSelection,t];planTags();});}
 $('plan-form').onsubmit=async e=>{
   e.preventDefault();$('submit-plan').disabled=true;
   try{
     const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);p.free=p.free==='on';p.accessible=p.accessible==='on';
-    if(Date.parse(p.end)<=Date.parse(p.start))throw new Error('End time needs to be after start time.');
+    Object.assign(p,planTimes(p.start,p.end));
     if(preview){p.id=crypto.randomUUID();write('wtm-preview-plans',[...read('wtm-preview-plans',[]),p]);}else{await api('plans','POST',p);}
     $('plan-dialog').close();e.target.reset();tagSelection=[];planTags();$('plan-error').textContent='';state.section='discover';state.day=dateKey(p.start);state.source='friends';state.region=p.region||'campus';document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='friends'));dates();await load();toast(preview?'Preview plan saved in this browser.':'Plan posted to the crew.');
   }catch(error){$('plan-error').textContent=error.message;}finally{$('submit-plan').disabled=false;}
