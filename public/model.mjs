@@ -37,7 +37,7 @@ export function select(events,{day='week',today=dateKey(Date.now()),interests=Ob
     const eventDay=dateKey(e.start),end=e.end?Date.parse(e.end):Date.parse(e.start)+(e.allDay?86400000:7200000);
     if(end<now && !(e.allDay&&eventDay===today))return false;
     if(day!=='week'&&!eventOnDay(e,day))return false;
-    if(day==='week'&&(dateKey(Math.max(Date.parse(e.start),end-1))<today||Date.parse(e.start)>now+7*86400000))return false;
+    if(day==='week'&&(dateKey(Math.max(Date.parse(e.start),end-1))<today||dateKey(e.start)>=dateKey(Date.parse(stanfordTime(today+'T12:00'))+7*86400000)))return false;
     if(source==='saved'&&!saved.includes(e.id))return false;
     if(region!=='all'&&(e.region||'campus')!==region)return false;
     if(source==='campus'&&e.source==='friends')return false;

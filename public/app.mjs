@@ -43,7 +43,8 @@ function render(){
   $('hero-title').closest('.hero').classList.toggle('moves-hero',moving);
   $('identity').hidden=!ready; $('identity').textContent=member||'Your name';
   $('import-saves').hidden=!moving||read('wtm-saves-shared',false)||!events.some(e=>legacySaves.includes(e.id)&&!e.groupSaved);
-  const list=select(events,moving?{...state,source:'saved',matched:false,sort:'time'}:state);
+  const filters=moving?{...state,source:'saved',matched:false,sort:'time'}:state;
+  const list=select(events,state.view==='calendar'?{...filters,day:'week',today:state.day==='week'?state.today:state.day}:filters);
   $('dates').hidden=state.view==='calendar';
   $('sort').hidden=state.view==='calendar';
   document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===state.view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
@@ -135,7 +136,7 @@ function removalConfirmation(){return new Promise(resolve=>{
   $('cancel-remove').onclick=()=>dialog.close();
   dialog.addEventListener('close',()=>resolve(confirmed),{once:true});dialog.showModal();
 });}
-document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;if(state.view==='calendar'){state.day='week';dates();}write('wtm-view',state.view);render();});
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;dates();write('wtm-view',state.view);render();});
 async function load(){
   try {
     const data=preview?await fetch('preview-data.json').then(r=>r.json()):await api('events');

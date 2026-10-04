@@ -27,6 +27,7 @@ test('multi-day plans accept the October 17–18 range and appear on both dates'
  const e={title:'Weekend plan',description:'',location:'Campus',start,end,source:'friends',topics:[],free:true,accessible:true};
  assert.equal(eventOnDay(e,'2026-10-17'),true);assert.equal(eventOnDay(e,'2026-10-18'),true);assert.equal(eventOnDay(e,'2026-10-19'),false);
  assert.equal(select([e],{day:'2026-10-18',now,matched:false}).length,1);
+ assert.equal(select([e],{day:'week',today:'2026-10-17',now,matched:false}).length,1);
  assert.equal(select([e],{day:'week',today:'2026-10-18',now:Date.parse(stanfordTime('2026-10-18T10:00')),matched:false}).length,1);
  assert.equal(eventOnDay({...e,end:stanfordTime('2026-10-18T00:00')},'2026-10-18'),false);
 });
