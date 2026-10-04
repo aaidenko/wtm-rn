@@ -3,7 +3,7 @@ const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
 const state={day:'week',view:read('wtm-view','list'),today:dateKey(Date.now()),interests:read('wtm-interests',Object.keys(TOPICS)),saved:read('wtm-saved',[]),section:'discover',source:'all',region:'campus',matched:true,free:true,search:'',sort:'match'};
-let events=[],tagSelection=[],ready=false;
+let events=[],tagSelection=[],ready=false,member=null,detailId=null,attendanceBusy=false,nameForAttendance=false;
 const legacySaves=read('wtm-saved',[]);
 const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -76,7 +76,7 @@ async function toggleGroupSave(id){
   const e=events.find(e=>e.id===id);if(!e||saving.has(id))return;
   saving.add(id);
   try{
-    if(preview){const group=read('wtm-preview-group',[]);write('wtm-preview-group',e.groupSaved?group.filter(x=>x!==id):[...group,id]);}
+    if(preview){const group=read('wtm-preview-group',[]);write('wtm-preview-group',e.groupSaved?group.filter(x=>x!==id):[...group,id]);if(e.groupSaved)write('wtm-preview-going-'+id,[]);}
     else await api('group-moves',e.groupSaved?'DELETE':'POST',{eventId:id});
     await load();
   }catch(error){toast(error.message);}finally{saving.delete(id);}
@@ -85,6 +85,7 @@ $('import-saves').onclick=async()=>{try{for(const e of events.filter(e=>legacySa
 function saveButton(e){return `<button class="row-save" data-save="${escape(e.id)}" aria-label="${state.saved.includes(e.id)?'Remove from group':'Save to group'} ${escape(e.title)}" aria-pressed="${state.saved.includes(e.id)}">${state.saved.includes(e.id)?'★':'☆'}</button>`;}
 function showDetail(id){
   const e=events.find(e=>e.id===id);if(!e)return;
+  detailId=id;
   $('detail-source').textContent=e.sourceName||e.source;
   $('detail-title').textContent=e.title;
   $('detail-when').textContent=shortDate(e.start)+' · '+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+(dateKey(e.start)!==dateKey(e.end)?shortDate(e.end)+' · ':'')+time(e.end):''))+' · Stanford time';
@@ -96,8 +97,52 @@ function showDetail(id){
   const save=$('detail-save');
   const updateSave=()=>{save.textContent=state.saved.includes(id)?'★':'☆';save.setAttribute('aria-label',(state.saved.includes(id)?'Remove from group ':'Save to group ')+e.title);save.setAttribute('aria-pressed',String(state.saved.includes(id)));};
   updateSave();save.onclick=async()=>{await toggleGroupSave(id);updateSave();};
+  updateAttendance();
   $('event-dialog').showModal();
 }
+function updateAttendance(){
+  const e=events.find(e=>e.id===detailId),saved=!!e?.groupSaved;
+  $('detail-attendance').hidden=!saved;
+  $('attendance-name-form').hidden=true;
+  if(!saved)return;
+  const attending=!!e.going?.some(p=>p.me);
+  $('attendee-names').textContent=e.going?.length?e.going.map(p=>p.name+(p.me?' (you)':'')).join(', '):'No one has marked attending yet.';
+  $('attending-toggle').textContent=attending?'✓ I’m attending':'I’m attending';
+  $('attending-toggle').setAttribute('aria-pressed',String(attending));
+  $('attending-toggle').disabled=attendanceBusy;
+  $('edit-attendance-name').hidden=!member;
+}
+function attendanceNameForm(attend){
+  nameForAttendance=attend;$('attendance-name-error').textContent='';
+  $('attendance-name-form').hidden=false;$('attendance-name-form').elements.name.value=member||'';
+  $('attendance-name-submit').textContent=attend?'Save & attend':'Save name';
+  $('attendance-name-form').elements.name.focus();
+}
+async function setAttendance(attending){
+  const e=events.find(e=>e.id===detailId);if(!e?.groupSaved||attendanceBusy)return;
+  attendanceBusy=true;$('attending-toggle').disabled=true;
+  try{
+    if(preview)write('wtm-preview-going-'+e.id,attending?[...(e.going||[]).filter(p=>!p.me),{name:member,me:true}]:(e.going||[]).filter(p=>!p.me));
+    else await api('attendance',attending?'POST':'DELETE',{eventId:e.id});
+    await load();
+  }catch(error){toast(error.message);}finally{attendanceBusy=false;updateAttendance();}
+}
+$('attending-toggle').onclick=()=>{
+  const e=events.find(e=>e.id===detailId);if(!member){attendanceNameForm(true);return;}
+  setAttendance(!e?.going?.some(p=>p.me));
+};
+$('edit-attendance-name').onclick=()=>attendanceNameForm(false);
+$('cancel-attendance-name').onclick=()=>{$('attendance-name-form').hidden=true;};
+$('attendance-name-form').onsubmit=async event=>{
+  event.preventDefault();$('attendance-name-submit').disabled=true;
+  try{
+    const name=new FormData(event.target).get('name').trim();if(!name)throw new Error('Enter your name.');
+    const attend=nameForAttendance;
+    if(preview){member=name;write('wtm-preview-member',name);for(const e of events){const names=read('wtm-preview-going-'+e.id,[]);if(names.some(p=>p.me))write('wtm-preview-going-'+e.id,names.map(p=>p.me?{...p,name}:p));}}
+    else member=(await api('identity','POST',{name})).name;
+    if(attend)await setAttendance(true);else await load();
+  }catch(error){$('attendance-name-error').textContent=error.message;}finally{$('attendance-name-submit').disabled=false;}
+};
 $('close-event').onclick=()=>$('event-dialog').close();
 function removalConfirmation(){return new Promise(resolve=>{
   const dialog=$('remove-dialog');let confirmed=false;
@@ -117,13 +162,14 @@ async function loadFeed(){
     const data=preview?await fetch('preview-data.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.json()):await api('events');
     if(preview){data.plans=read('wtm-preview-plans',[]);$('preview').hidden=false;}
     events=data.events||normalize(data);
-    if(preview){const group=read('wtm-preview-group',[]);events=events.map(e=>({...e,groupSaved:group.includes(e.id)}));}
+    member=data.member||null;
+    if(preview){member=read('wtm-preview-member',null);const group=read('wtm-preview-group',[]);events=events.map(e=>({...e,groupSaved:group.includes(e.id),going:read('wtm-preview-going-'+e.id,[])}));}
     state.saved=events.filter(e=>e.groupSaved).map(e=>e.id);ready=true;
     const stale=!data.updatedAt||Date.now()-Date.parse(data.updatedAt)>30*3600000;
     $('freshness').classList.toggle('stale',stale);
     $('freshness').textContent=data.updatedAt?`Daily feed · Last Stanford refresh: ${shortDate(data.updatedAt)}, ${time(data.updatedAt)}${stale?' · Feed is overdue; check event links for updates.':''}${data.warnings?.length?' · '+data.warnings.join(' '):''}`:'Campus feed unavailable. Friends’ plans still work. Check Stanford Events for current listings.';
     $('logout').hidden=preview;
-    if($('login').open)$('login').close();render();
+    if($('login').open)$('login').close();render();if($('event-dialog').open)updateAttendance();
   }catch(e){
     if(e.status===401){ready=false;$('freshness').textContent='An invite code keeps this feed for your crew.';if(!$('login').open)$('login').showModal();}
     else{$('freshness').textContent=e.message;$('cards').innerHTML='<div class="empty"><strong>The feed needs a little setup.</strong>'+escape(e.message)+'</div>';}

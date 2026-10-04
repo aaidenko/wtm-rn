@@ -11,7 +11,7 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 ## Browse events
 
 - Discover: browse free events with interest and location filters.
-- Your Moves: shared group saves in Neon, ordered by time. Tap an outlined star to save for everyone, or a filled star to remove it. Saving keeps the event layout unchanged. Previous private saves can be shared with the import button. Interest filters never hide group moves. The page checks for group changes every 30 seconds while visible, pauses in hidden tabs, and refreshes on returning.
+- Your Moves: shared group saves in Neon, ordered by time. Tap an outlined star to save for everyone, or a filled star to remove it. Saving keeps the event layout unchanged. Open a saved event to mark yourself attending; your name and the other attendees appear only in the event details. Tap the attending button again to remove yourself. Names are remembered with a signed browser cookie and can be edited inside that dialog. Previous private saves can be shared with the import button. Interest filters never hide group moves. The page checks for group changes every 30 seconds while visible, pauses in hidden tabs, and refreshes on returning.
 - Sort by Relevant tags (number matching selected interests, with date as the tie breaker) or Date (soonest first).
 - List: compact rows, with event details on click.
 - Calendar: a day, seven days or the next 30 days, with events ordered by time within each day. Swipe across days on a phone.
