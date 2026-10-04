@@ -46,7 +46,11 @@ Manage calendars → Discovery sources & newsletters shows the source directory.
 - ASES website and join form: https://ases.stanford.edu/
 - AI Club example and speaker host calendar: https://luma.com/r01e3zn0
 
-Optional dedicated Gmail scanning is implemented but **not connected until credentials are set**. Joining a list does not make its messages public. Paste a Luma event from an announcement into Manage calendars to recheck that event daily. No email subscriptions or messages were sent on your behalf. Partiful links remain manual plans.
+Optional dedicated Gmail scanning is implemented but **not connected until credentials are set**. Joining a list does not make its messages public. Paste a Luma event from an announcement into Manage calendars to recheck that event daily. Partiful links remain manual plans.
+
+The designated subscription inbox is **wtminbox@gmail.com**. When adding a relevant free mailing-list source, subscribe this inbox through its official signup form, check for an existing signup first, and record the result. Stanford-only lists may require a Stanford address and selective forwarding to this inbox. These third-party forms are handled during source setup; adding a calendar in WTM does not automatically submit a newsletter form. Required CAPTCHA or confirmation steps must be completed before claiming an active subscription.
+
+Subscription status as of October 4, 2026: BASES recorded the signup request; HAI confirmed the Research, News, and Events subscription. SAGA accepted the newsletter contact form with the designated inbox as the personal email and the owner's Stanford address for eligibility; the actual delivery destination remains unverified. The AI Club list is https://mailman.stanford.edu/mailman/listinfo/saic-members and requires CAPTCHA plus email confirmation. ASES's current Join us link opens a bootcamp application, so it is not offered as a newsletter signup in WTM.
 
 ## Connect a free dedicated Gmail inbox
 
