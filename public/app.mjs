@@ -2,7 +2,7 @@ import {TOPICS,dateKey,zone,normalize,select,stanfordTime,safeURL} from './model
 const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
-const state={day:'week',view:read('wtm-view','list'),today:dateKey(Date.now()),interests:read('wtm-interests',Object.keys(TOPICS)),saved:read('wtm-saved',[]),source:'all',region:'campus',matched:true,free:false,search:'',sort:'match'};
+const state={day:'week',view:read('wtm-view','list'),today:dateKey(Date.now()),interests:read('wtm-interests',Object.keys(TOPICS)),saved:read('wtm-saved',[]),source:'all',region:'campus',matched:true,free:true,search:'',sort:'match'};
 let events=[],tagSelection=[],ready=false;
 const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -34,17 +34,17 @@ function render(){
   $('count').textContent=`${list.length} ${list.length===1?'plan':'plans'} · Stanford time`;
   if(!list.length&&state.view!=='calendar'){$('cards').innerHTML='<div class="empty"><strong>No moves here yet.</strong>Try This week, clear your search, or turn off “My interests only”.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
   if(state.view==='list') {
-    $('cards').innerHTML=list.map(e=>`<article class="event-row"><div class="row-when"><strong>${escape(shortDate(e.start))}</strong><span>${escape(e.allDay?'All day':time(e.start))}</span></div><button class="row-main" data-detail="${escape(e.id)}"><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</span></button><div class="row-tags">${e.topics.slice(0,3).map(t=>`<span>${escape(t)}</span>`).join('')}</div><span class="row-source">${e.source==='friends'?'Friends':e.source==='luma'?'Luma':e.source==='calendar'?'Calendar':'Stanford'}${e.free?' · Free':''}</span>${saveButton(e)}${e.source==='friends'?`<button class="remove" data-remove="${escape(e.id)}">Remove</button>`:''}</article>`).join('');
+    $('cards').innerHTML=list.map(e=>`<article class="event-row"><div class="row-when"><strong>${escape(shortDate(e.start))}</strong><span>${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}</span></div><button class="row-main" data-detail="${escape(e.id)}"><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</span></button><div class="row-tags">${e.topics.slice(0,3).map(t=>`<span>${escape(t)}</span>`).join('')}</div><span class="row-source">${escape(e.sourceName||e.source)}${e.approvalRequired?' · Approval':''}</span>${saveButton(e)}${e.source==='friends'?`<button class="remove" data-remove="${escape(e.id)}">Remove</button>`:''}</article>`).join('');
   } else if(state.view==='calendar') {
     const start=stanfordTime((state.day==='week'?state.today:state.day)+'T12:00');
     const days=Array.from({length:7},(_,i)=>dateKey(Date.parse(start)+i*86400000));
     $('cards').innerHTML=`<div class="calendar-scroll"><div class="calendar-grid">${days.map(day=>{
       const entries=list.filter(e=>dateKey(e.start)===day).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
-      return `<section class="calendar-day ${day===state.today?'is-today':''}"><div class="calendar-day-heading"><strong>${escape(shortDate(stanfordTime(day+'T12:00')))}</strong><span>${entries.length} ${entries.length===1?'event':'events'}</span></div>${entries.length?entries.map(e=>`<button class="calendar-event topic-${Object.keys(TOPICS).indexOf(e.topics[0])}" data-detail="${escape(e.id)}"><span class="calendar-time">${escape(e.allDay?'All day':time(e.start))}${e.free?' · Free':''}</span><strong>${escape(e.title)}</strong><span class="calendar-location">${escape(e.location)}</span><span class="calendar-source">${e.source==='friends'?'Friends':e.source==='luma'?'Luma':e.source==='calendar'?'Calendar':'Stanford'}${e.topics[0]?' · '+escape(e.topics[0]):''}</span></button>`).join(''):'<p class="calendar-none">No matching events</p>'}</section>`;
+      return `<section class="calendar-day ${day===state.today?'is-today':''}"><div class="calendar-day-heading"><strong>${escape(shortDate(stanfordTime(day+'T12:00')))}</strong><span>${entries.length} ${entries.length===1?'event':'events'}</span></div>${entries.length?entries.map(e=>`<button class="calendar-event topic-${Object.keys(TOPICS).indexOf(e.topics[0])}" data-detail="${escape(e.id)}"><span class="calendar-time">${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}${e.approvalRequired?' · Approval':''}</span><strong>${escape(e.title)}</strong><span class="calendar-location">${escape(e.location)}</span><span class="calendar-source">${escape(e.sourceName||e.source)}${e.topics[0]?' · '+escape(e.topics[0]):''}</span></button>`).join(''):'<p class="calendar-none">No matching events</p>'}</section>`;
     }).join('')}</div></div><p class="calendar-help">Select an event for details. On your phone, swipe across the days. All times are at Stanford.</p>`;
   } else $('cards').innerHTML=list.map(e=>{
     const matched=e.topics.filter(t=>state.interests.includes(t));
-    const when=(state.day==='week'?shortDate(e.start)+' · ':'')+(e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''));
+    const when=(state.day==='week'?shortDate(e.start)+' · ':'')+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''));
     const source=e.source==='friends'?'FRIENDS':e.source==='luma'?'LUMA':e.source==='calendar'?'CALENDAR':'STANFORD';
     const link=e.url?`<a href="${escape(e.url)}" target="_blank" rel="noopener noreferrer">${e.source==='friends'?'Event link':e.source==='luma'?'Details & RSVP':'Details & registration'} ↗</a>`:'<span>Ask the host for details</span>';
     return `<article class="card"><div class="card-top ${e.image?'':'placeholder'}">${e.image?`<img src="${escape(e.image)}" alt="" loading="lazy">`:escape(e.source==='friends'?'Your people.':e.topics[0]||'Good plans.')}<span class="source-badge">${source}</span><button class="save" data-save="${escape(e.id)}" aria-label="${state.saved.includes(e.id)?'Unsave':'Save'} ${escape(e.title)}" aria-pressed="${state.saved.includes(e.id)}">${state.saved.includes(e.id)?'★':'☆'}</button></div><div class="card-body"><div class="when">${escape(when)}</div><h3>${escape(e.title)}</h3><div class="location">⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</div><p class="description">${escape(e.description.slice(0,175))}${e.description.length>175?'…':''}</p><div class="tags" aria-label="Matching interests">${(matched.length?matched:e.topics).map(t=>`<span>${escape(t)}</span>`).join('')}${e.source==='friends'&&!e.topics.length?'<span>Hangout</span>':''}</div><div class="card-bottom">${link}<span class="price">${e.free?'Free entry':escape(e.price||'Cost not listed')}</span></div>${e.source==='friends'?`<div class="card-bottom"><span>Shared by ${escape(e.host)}</span><button class="remove" data-remove="${escape(e.id)}">Remove plan</button></div>`:''}</div></article>`;
@@ -61,8 +61,9 @@ function showDetail(id){
   const e=events.find(e=>e.id===id);if(!e)return;
   $('detail-source').textContent=e.sourceName||e.source;
   $('detail-title').textContent=e.title;
-  $('detail-when').textContent=shortDate(e.start)+' · '+(e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''))+' · Stanford time';
+  $('detail-when').textContent=shortDate(e.start)+' · '+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+time(e.end):''))+' · Stanford time';
   $('detail-location').textContent='⌖ '+e.location;
+  $('detail-eligibility').textContent='Free admission · '+e.access+' · '+e.freeEvidence;
   $('detail-tags').innerHTML=e.topics.map(t=>`<span>${escape(t)}</span>`).join('');
   $('detail-description').textContent=e.description||'Ask the host or check the event page for more details.';
   $('detail-link').innerHTML=e.url?`<a class="primary detail-rsvp" href="${escape(e.url)}" target="_blank" rel="noopener noreferrer">Event details & RSVP ↗</a>`:'<p>Ask the host for details.</p>';
@@ -83,7 +84,7 @@ async function load(){
   try {
     const data=preview?await fetch('preview-data.json').then(r=>r.json()):await api('events');
     if(preview){data.plans=read('wtm-preview-plans',[]);$('preview').hidden=false;}
-    events=normalize(data);ready=true;
+    events=data.events||normalize(data);ready=true;
     const stale=!data.updatedAt||Date.now()-Date.parse(data.updatedAt)>30*3600000;
     $('freshness').classList.toggle('stale',stale);
     $('freshness').textContent=data.updatedAt?`Daily feed · Last Stanford refresh: ${shortDate(data.updatedAt)}, ${time(data.updatedAt)}${stale?' · Feed is overdue; check event links for updates.':''}${data.warnings?.length?' · '+data.warnings.join(' '):''}`:'Campus feed unavailable. Friends’ plans still work. Check Stanford Events for current listings.';
@@ -103,7 +104,7 @@ function planTags(){const names=[...Object.keys(TOPICS),'Hangout'];$('plan-tags'
 $('plan-form').onsubmit=async e=>{
   e.preventDefault();$('submit-plan').disabled=true;
   try{
-    const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);
+    const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);p.free=p.free==='on';p.accessible=p.accessible==='on';
     if(Date.parse(p.end)<=Date.parse(p.start))throw new Error('End time needs to be after start time.');
     if(preview){p.id=crypto.randomUUID();write('wtm-preview-plans',[...read('wtm-preview-plans',[]),p]);}else{await api('plans','POST',p);}
     $('plan-dialog').close();e.target.reset();tagSelection=[];planTags();$('plan-error').textContent='';state.day=dateKey(p.start);state.source='friends';state.region=p.region||'campus';document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='friends'));dates();await load();toast(preview?'Preview plan saved in this browser.':'Plan posted to the crew.');
@@ -114,7 +115,8 @@ document.querySelectorAll('[data-region]').forEach(b=>b.onclick=()=>{state.regio
 const previewCalendars=[{id:'stanford',name:'Stanford Events',region:'campus',builtin:true},{id:'stanford-builders',name:'Stanford xBuilders',region:'campus'},{id:'luma-sf',name:'Luma · San Francisco',region:'sf'}];
 async function calendarSettings(){
   const data=preview?{calendars:read('wtm-preview-calendars',previewCalendars)}:await api('calendars');
-  $('calendar-settings').innerHTML=data.calendars.map(c=>`<div class="calendar-setting"><div><strong>${escape(c.name)}</strong><span>${c.region==='sf'?'SF':'Stanford & nearby'} · ${c.updated_at?'Last scanned '+shortDate(c.updated_at)+', '+time(c.updated_at):preview?'Preview calendar':'Waiting for first scan'}${c.last_error?' · Scan failed; keeping saved events.':''}</span></div>${c.builtin?'<span>Always on</span>':`<button class="quiet" data-remove-calendar="${escape(c.id)}">Remove</button>`}</div>`).join('');
+  $('source-directory').innerHTML=(data.sources||[]).map(s=>`<div class="source-entry"><a href="${escape(safeURL(s.url))}" target="_blank" rel="noopener noreferrer">${escape(s.name)} ↗</a><span>${escape(s.mode)}</span>${s.newsletter?`<a href="${escape(safeURL(s.newsletter))}" target="_blank" rel="noopener noreferrer">Join / updates ↗</a>`:''}</div>`).join('');
+  $('calendar-settings').innerHTML=data.calendars.map(c=>`<div class="calendar-setting"><div><strong>${escape(c.name)}</strong><span>${c.region==='sf'?'SF':'Stanford & nearby'} · ${c.updated_at?'Last scanned '+shortDate(c.updated_at)+', '+time(c.updated_at):preview?'Preview calendar':'Waiting for first scan'}${c.eligible_count!==undefined?' · '+c.eligible_count+' eligible free events':''}${c.unverified_count?' · '+c.unverified_count+' prices could not be verified':''}${c.last_error?' · Scan failed; keeping saved events.':''}</span></div>${c.builtin?'<span>Always on</span>':`<button class="quiet" data-remove-calendar="${escape(c.id)}">Remove</button>`}</div>`).join('');
   $('calendar-settings').querySelectorAll('[data-remove-calendar]').forEach(b=>b.onclick=async()=>{
     try{if(preview){write('wtm-preview-calendars',data.calendars.filter(c=>c.id!==b.dataset.removeCalendar));}else{await api('calendars/'+encodeURIComponent(b.dataset.removeCalendar),'DELETE');}await calendarSettings();await load();toast('Calendar removed from the group feed.');}catch(e){$('calendar-error').textContent=e.message;}
   });
@@ -130,7 +132,7 @@ $('calendar-form').onsubmit=async e=>{
   }catch(error){$('calendar-error').textContent=error.message;}finally{$('submit-calendar').disabled=false;}
 };
 $('search').oninput=e=>{state.search=e.target.value;render();};
-for(const id of ['matched','free'])$(id).onchange=e=>{state[id]=e.target.checked;render();};
+for(const id of ['matched'])$(id).onchange=e=>{state[id]=e.target.checked;render();};
 $('sort').onchange=e=>{state.sort=e.target.value;render();};
 $("filters-panel").open=!matchMedia("(max-width:650px)").matches;
 dates();topics();planTags();load();

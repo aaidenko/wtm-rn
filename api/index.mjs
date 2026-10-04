@@ -1,3 +1,5 @@
+import {scanPublicPages,SOURCE_DIRECTORY} from '../lib/sources.mjs';
+import {normalize} from '../public/model.mjs';
 import {neon} from '@neondatabase/serverless';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import {collect,validatePlan,validateCalendar,fetchCalendar,DEFAULT_CALENDARS} from '../lib/core.mjs';
@@ -9,13 +11,17 @@ async function database() {
   if(!initialized) {
     await sql`CREATE TABLE IF NOT EXISTS snapshots (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL)`;
     await sql`CREATE TABLE IF NOT EXISTS plans (id TEXT PRIMARY KEY, title TEXT NOT NULL, host TEXT NOT NULL, location TEXT NOT NULL, start TIMESTAMPTZ NOT NULL, "end" TIMESTAMPTZ NOT NULL, description TEXT NOT NULL, tags JSONB NOT NULL, url TEXT NOT NULL DEFAULT '', region TEXT NOT NULL DEFAULT 'campus', created_at TIMESTAMPTZ NOT NULL)`;
+    await sql`ALTER TABLE plans ADD COLUMN IF NOT EXISTS free BOOLEAN NOT NULL DEFAULT FALSE`;
+    await sql`ALTER TABLE plans ADD COLUMN IF NOT EXISTS accessible BOOLEAN NOT NULL DEFAULT FALSE`;
     await sql`CREATE INDEX IF NOT EXISTS plans_end ON plans("end")`;
     await sql`CREATE TABLE IF NOT EXISTS calendars (id TEXT PRIMARY KEY,name TEXT NOT NULL,url TEXT UNIQUE NOT NULL,region TEXT NOT NULL,events JSONB NOT NULL DEFAULT '[]',updated_at TIMESTAMPTZ,last_error TEXT)`;
     await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY,value TEXT NOT NULL)`;
-    const [seed]=await sql`SELECT value FROM settings WHERE key='calendars_seeded'`;
+    const [seed]=await sql`SELECT value FROM settings WHERE key='club_sources_v2'`;
     if(!seed){
-      for(const c of DEFAULT_CALENDARS)await sql`INSERT INTO calendars(id,name,url,region) VALUES(${c.id},${c.name},${c.url},${c.region}) ON CONFLICT DO NOTHING`;
-      await sql`INSERT INTO settings(key,value) VALUES('calendars_seeded','true') ON CONFLICT DO NOTHING`;
+      const [legacy]=await sql`SELECT value FROM settings WHERE key='calendars_seeded'`;
+      const additions=legacy?DEFAULT_CALENDARS.filter(c=>!['stanford-builders','luma-sf'].includes(c.id)):DEFAULT_CALENDARS;
+      for(const c of additions)await sql`INSERT INTO calendars(id,name,url,region) VALUES(${c.id},${c.name},${c.url},${c.region}) ON CONFLICT DO NOTHING`;
+      await sql`INSERT INTO settings(key,value) VALUES('club_sources_v2','true') ON CONFLICT DO NOTHING`;
     }
     initialized=true;
   }
@@ -24,12 +30,14 @@ async function database() {
 async function refresh(sql) {
   const calendars=await sql`SELECT id,name,url,region FROM calendars ORDER BY id LIMIT 12`;
   const campusPromise=collect(fetch,[]);
+  const publicPromise=scanPublicPages();
   const scans=Promise.all(calendars.map(async c=>{
     try{const events=await fetchCalendar(c);await sql`UPDATE calendars SET events=${JSON.stringify(events)},updated_at=NOW(),last_error=NULL WHERE id=${c.id}`;}
     catch(e){await sql`UPDATE calendars SET last_error=${e.message} WHERE id=${c.id}`;}
   }));
-  let data;try{data=await campusPromise;}catch(e){await scans;throw e;}
+  let data;try{data=await campusPromise;}catch(e){await scans;await publicPromise;throw e;}
   await scans;
+  const publicSources=await publicPromise;data.external=publicSources.events;data.sourceReports=publicSources.reports;
   await sql`INSERT INTO snapshots(id,data,updated_at) VALUES(1,${JSON.stringify(data)},${data.updatedAt}) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at`;
   await sql`DELETE FROM plans WHERE "end" < ${new Date(Date.now()-30*86400000).toISOString()}`;
   return data;
@@ -65,12 +73,14 @@ export default async function handler(req,res) {
       if(!data) {try{data=await refresh(sql);}catch{data={pages:[],external:[],updatedAt:null,feedError:true};}}
       const plans=await sql`SELECT * FROM plans WHERE "end" >= NOW() ORDER BY start LIMIT 500`;
       const calendars=await sql`SELECT events,last_error,name FROM calendars ORDER BY id`;
-      return send({...data,external:calendars.flatMap(c=>c.events),warnings:calendars.filter(c=>c.last_error).map(c=>`${c.name} couldn’t refresh; showing its last saved events.`),plans});
+      const external=[...(data.external||[]),...calendars.flatMap(c=>c.events)];
+      const filtered=normalize({...data,external,plans});
+      return send({events:filtered,updatedAt:data.updatedAt,sourceReports:data.sourceReports||[],warnings:[...calendars.filter(c=>c.last_error).map(c=>`${c.name} couldn’t refresh; showing its last saved events.`),...(data.sourceReports||[]).filter(s=>s.last_error).map(s=>`${s.name} scan failed.`)]});
     }
     if(path==='calendars' && req.method==='GET'){
-      const calendars=await sql`SELECT id,name,region,updated_at,last_error FROM calendars ORDER BY name`;
-      const [snapshot]=await sql`SELECT updated_at FROM snapshots WHERE id=1`;
-      return send({calendars:[{id:'stanford',name:'Stanford Events',region:'campus',updated_at:snapshot?.updated_at||null,builtin:true},...calendars]});
+      const calendars=await sql`SELECT id,name,region,updated_at,last_error,events FROM calendars ORDER BY name`;
+      const [snapshot]=await sql`SELECT updated_at,data FROM snapshots WHERE id=1`;
+      return send({sources:SOURCE_DIRECTORY,reports:snapshot?.data?.sourceReports||[],calendars:[{id:'stanford',name:'Stanford Events',region:'campus',updated_at:snapshot?.updated_at||null,builtin:true},...calendars.map(({events,...c})=>({...c,eligible_count:events.filter(e=>e.free&&e.accessible).length,unverified_count:events.filter(e=>e.verificationError).length}))]});
     }
     if(path==='calendars' && req.method==='POST'){
       const [{count}]=await sql`SELECT COUNT(*)::int AS count FROM calendars`;if(count>=12)return send({error:'You can follow up to 12 additional calendars. Remove one first.'},400);
@@ -89,7 +99,7 @@ export default async function handler(req,res) {
       if(Number(req.headers['content-length']||0)>10000) return send({error:'Plan is too long'},413);
       let p;try{p=validatePlan(req.body);}catch(e){return send({error:e.message},400);}
       const id=randomUUID();
-      await sql`INSERT INTO plans(id,title,host,location,start,"end",description,tags,url,region,created_at) VALUES(${id},${p.title.trim()},${p.host.trim()},${p.location.trim()},${p.start},${p.end},${p.description.trim()},${JSON.stringify(p.tags)},${p.url},${p.region||"campus"},NOW())`;
+      await sql`INSERT INTO plans(id,title,host,location,start,"end",description,tags,url,region,free,accessible,created_at) VALUES(${id},${p.title.trim()},${p.host.trim()},${p.location.trim()},${p.start},${p.end},${p.description.trim()},${JSON.stringify(p.tags)},${p.url},${p.region||"campus"},TRUE,TRUE,NOW())`;
       return send({id},201);
     }
     if(path.startsWith('plans/') && req.method==='DELETE') {await sql`DELETE FROM plans WHERE id=${path.slice(6)}`;return send({ok:true});}

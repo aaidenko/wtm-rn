@@ -1,3 +1,4 @@
+import {admission,studentAccess} from './eligibility.mjs';
 export const TOPICS={
   'Startups':/\b(startups?|founders|founder (?:meetup|networking|dinner|pitch)|entrepreneur\w*|venture capital|pitch competition|startup accelerator|VC)\b/i,
   'Trading':/\b(trading|quantitative finance|quants?|financial markets?|hedge funds?|stock markets?|fintech|market microstructure|portfolio management|asset pricing)\b/i,
@@ -20,15 +21,19 @@ export function normalize(data) {
       if(!t?.start||!Number.isFinite(Date.parse(t.start))) continue;
       const id=`stanford:${e.id}:${t.id||t.start}`;if(seen.has(id))continue;seen.add(id);
       const tags=Object.values(e.filters||{}).flat().map(f=>f.name).filter(Boolean);
-      result.push({id,title:e.title,description:e.description_text||'',location:e.location_name||e.location||'See event page',start:t.start,end:t.end,allDay:!!t.all_day,free:e.free===true,url:safeURL(e.localist_url),image:safeURL(e.photo_url),tags,source:'campus',region:'campus',sourceName:'Stanford Events',price:e.ticket_cost||''});
+      const eligible=admission(e.description_text||'',e.ticket_cost,e.free);
+      const access=studentAccess(e.description_text||'',{audiences:(e.filters?.event_audience||[]).map(a=>a.name)});
+      const department=(e.departments||[]).find(d=>/Human-Centered|Computer Science|HAI/i.test(d.name));
+      result.push({id,title:e.title,description:e.description_text||'',location:e.location_name||e.location||'See event page',start:t.start,end:t.end,allDay:!!t.all_day,...eligible,...access,url:safeURL(e.localist_url),image:safeURL(e.photo_url),tags,source:'campus',region:'campus',sourceName:department?.name||'Stanford Events',price:e.ticket_cost||''});
     }
   }
   for(const e of data.external||[]){const key=e.id+':'+(e.region||'campus');if(seen.has(key))continue;seen.add(key);result.push({...e,url:safeURL(e.url),image:safeURL(e.image)});}
-  for(const p of data.plans||[])result.push({...p,id:`friend:${p.id}`,source:'friends',sourceName:`${p.host}’s plan`,free:false,image:'',url:safeURL(p.url)});
-  return result.map(e=>({...e,topics:classify(e)}));
+  for(const p of data.plans||[])result.push({...p,id:`friend:${p.id}`,source:'friends',sourceName:`${p.host}’s plan`,free:p.free===true,accessible:p.accessible===true,access:'Stanford students · confirmed by friend',freeEvidence:'Confirmed by friend',image:'',url:safeURL(p.url)});
+  return result.filter(e=>e.free===true&&e.accessible===true).filter((e,i,all)=>all.findIndex(x=>x.url&&x.url===e.url&&x.start===e.start)===i||!e.url).map(e=>({...e,topics:classify(e)}));
 }
 export function select(events,{day='week',today=dateKey(Date.now()),interests=Object.keys(TOPICS),matched=true,source='all',region='all',search='',free=false,saved=[],sort='match',now=Date.now()}) {
   return events.filter(e=>{
+    if(e.free!==true||e.accessible!==true)return false;
     const eventDay=dateKey(e.start),end=e.end?Date.parse(e.end):Date.parse(e.start)+(e.allDay?86400000:7200000);
     if(end<now && !(e.allDay&&eventDay===today))return false;
     if(day!=='week'&&eventDay!==day)return false;
