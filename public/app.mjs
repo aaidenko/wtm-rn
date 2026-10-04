@@ -138,7 +138,7 @@ function planTags(){const names=[...Object.keys(TOPICS),'Hangout'];$('plan-tags'
 $('plan-form').onsubmit=async e=>{
   e.preventDefault();$('submit-plan').disabled=true;
   try{
-    const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);p.free=p.free==='on';p.accessible=p.accessible==='on';
+    const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);p.free=true;p.accessible=true;
     Object.assign(p,planTimes(p.start,p.end));
     if(preview){p.id=crypto.randomUUID();write('wtm-preview-plans',[...read('wtm-preview-plans',[]),p]);}else{await api('plans','POST',p);}
     $('plan-dialog').close();e.target.reset();tagSelection=[];planTags();$('plan-error').textContent='';state.section='discover';state.day=dateKey(p.start);state.source='friends';state.region=p.region||'campus';document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='friends'));dates();await load();toast(preview?'Preview plan saved in this browser.':'Plan posted to the crew.');

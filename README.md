@@ -20,7 +20,7 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 - Today, Tomorrow, This week and Next 30 days; interest filters, search, free admission enforced across all views, and saved events.
 - Mobile filters collapse to leave more room for events.
 
-Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group saves are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
+Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group saves are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friend plans default to free and accessible to Stanford students when submitted; the posting form has no admission confirmation checkboxes. This is organizer information, not a guarantee that a host will approve an RSVP.
 
 ## Add calendars
 
