@@ -10,6 +10,8 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 
 ## Browse events
 
+- Discover: browse free events with interest and location filters.
+- Your Moves: a prominent separate section for saved events, ordered by time. Interest filters never hide saved picks. A shortlist preview appears above discovery filters. Saves are on the current device.
 - List: compact rows, with event details on click.
 - Calendar: seven days, with events ordered by time within each day. Swipe across days on a phone.
 - Cards: images and event descriptions.

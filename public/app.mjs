@@ -2,7 +2,7 @@ import {TOPICS,dateKey,zone,normalize,select,stanfordTime,safeURL} from './model
 const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
-const state={day:'week',view:read('wtm-view','list'),today:dateKey(Date.now()),interests:read('wtm-interests',Object.keys(TOPICS)),saved:read('wtm-saved',[]),source:'all',region:'campus',matched:true,free:true,search:'',sort:'match'};
+const state={day:'week',view:read('wtm-view','list'),today:dateKey(Date.now()),interests:read('wtm-interests',Object.keys(TOPICS)),saved:read('wtm-saved',[]),section:'discover',source:'all',region:'campus',matched:true,free:true,search:'',sort:'match'};
 let events=[],tagSelection=[],ready=false;
 const write=(key,value)=>{try{localStorage.setItem(key,JSON.stringify(value));}catch{}};
 const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -25,14 +25,29 @@ function dates(){
 const time=d=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(d));
 const shortDate=d=>new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'short',day:'numeric'}).format(new Date(d));
 function render(){
-  const list=select(events,state);
+  const moving=state.section==='moves';
+  const shortlist=select(events,{saved:state.saved,source:'saved',matched:false,region:'all',sort:'time',today:state.today});
+  $('moves-nav-count').textContent=shortlist.length;
+  document.querySelectorAll('[data-section]').forEach(b=>{const active=b.dataset.section===state.section;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
+  $('hero-eyebrow').textContent=moving?'THE PLANS YOU’VE PICKED.':'LESS SCROLLING. MORE SHOWING UP.';
+  $('hero-title').innerHTML=moving?'Your <em>moves.</em>':'What’s the <em>move?</em>';
+  $('hero-intro').textContent=moving?'Your saved talks, meetups, and plans. All in one place.':'Free events for Stanford students. Find something worth showing up for.';
+  $('hero-note').innerHTML=moving?`<span>YOUR WEEK, SORTED</span><strong>${shortlist.length} saved ${shortlist.length===1?'move.':'moves.'}</strong><p>Pick a plan. Bring your people.</p><div class="spark">★</div>`:'<span>YOUR KIND OF CAMPUS</span><strong>Big ideas.<br>Small group chats.</strong><p>Startups, CS, AI & everything after.</p><div class="spark">↗</div>';
+  $('moves-preview').hidden=moving||!ready;
+  $('moves-preview-empty').hidden=!!shortlist.length;
+  $('moves-preview-events').innerHTML=shortlist.slice(0,3).map(e=>`<button class="move-tile" data-move-detail="${escape(e.id)}"><span>${escape(shortDate(e.start))} · ${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}</span><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}</span></button>`).join('');
+  $('moves-preview-events').querySelectorAll('[data-move-detail]').forEach(b=>b.onclick=()=>showDetail(b.dataset.moveDetail));
+  $('moves-note').hidden=!moving;
+  $('filters-panel').hidden=moving;
+  $('hero-title').closest('.hero').classList.toggle('moves-hero',moving);
+  const list=select(events,moving?{...state,source:'saved',matched:false,sort:'time'}:state);
   $('dates').hidden=state.view==='calendar';
   $('sort').hidden=state.view==='calendar';
   document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===state.view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   $('cards').className=state.view==='cards'?'cards':state.view==='calendar'?'calendar':'event-list';
-  $('heading').textContent=state.source==='friends'?'From the group chat':state.source==='saved'?'Your saved moves':state.region==='sf'?'Around San Francisco':'Your next move';
+  $('heading').textContent=state.source==='friends'?'From the group chat':moving?'Your Moves':state.region==='sf'?'Around San Francisco':'Your next move';
   $('count').textContent=`${list.length} ${list.length===1?'plan':'plans'} · Stanford time`;
-  if(!list.length&&state.view!=='calendar'){$('cards').innerHTML='<div class="empty"><strong>No moves here yet.</strong>Try This week, clear your search, or turn off “My interests only”.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
+  if(!list.length&&state.view!=='calendar'){$('cards').innerHTML=moving?'<div class="empty"><strong>Your next move starts with a ☆.</strong>Save events in Discover and find them here.<br>If you’ve saved something already, try This week or Everywhere.</div>':'<div class="empty"><strong>No moves here yet.</strong>Try This week, clear your search, or turn off “My interests only”.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
   if(state.view==='list') {
     $('cards').innerHTML=list.map(e=>`<article class="event-row"><div class="row-when"><strong>${escape(shortDate(e.start))}</strong><span>${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}</span></div><button class="row-main" data-detail="${escape(e.id)}"><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</span></button><div class="row-tags">${e.topics.slice(0,3).map(t=>`<span>${escape(t)}</span>`).join('')}</div><span class="row-source">${escape(e.sourceName||e.source)}${e.approvalRequired?' · Approval':''}</span>${saveButton(e)}${e.source==='friends'?`<button class="remove" data-remove="${escape(e.id)}">Remove</button>`:''}</article>`).join('');
   } else if(state.view==='calendar') {
@@ -56,6 +71,13 @@ function render(){
     try{if(preview){write('wtm-preview-plans',read('wtm-preview-plans',[]).filter(p=>`friend:${p.id}`!==id));}else{await api(`plans/${encodeURIComponent(id.slice(7))}`,'DELETE');}await load();toast('Plan removed.');}catch(e){toast(e.message);}
   });
 }
+function setSection(section){
+  state.section=section;state.day='week';state.search='';$('search').value='';state.region=section==='moves'?'all':'campus';state.source='all';
+  document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));
+  document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='all'));dates();render();
+}
+document.querySelectorAll('[data-section]').forEach(b=>b.onclick=()=>setSection(b.dataset.section));
+$('open-moves').onclick=()=>setSection('moves');
 function saveButton(e){return `<button class="row-save" data-save="${escape(e.id)}" aria-label="${state.saved.includes(e.id)?'Unsave':'Save'} ${escape(e.title)}" aria-pressed="${state.saved.includes(e.id)}">${state.saved.includes(e.id)?'★':'☆'}</button>`;}
 function showDetail(id){
   const e=events.find(e=>e.id===id);if(!e)return;
@@ -97,7 +119,7 @@ async function load(){
 }
 $('login-form').onsubmit=async e=>{e.preventDefault();try{await api('session','POST',{code:new FormData(e.target).get('code')});$('login-error').textContent='';await load();}catch(error){$('login-error').textContent=error.message;}};
 $('login').addEventListener('cancel',e=>e.preventDefault());
-$('logout').onclick=async()=>{try{await api('logout','POST');events=[];ready=false;$('cards').replaceChildren();$('logout').hidden=true;await load();}catch(e){toast(e.message);}};
+$('logout').onclick=async()=>{try{await api('logout','POST');events=[];ready=false;render();$('cards').replaceChildren();$('logout').hidden=true;await load();}catch(e){toast(e.message);}};
 $('add').onclick=()=>{if(!ready){toast('Join your group before posting a plan.');return;}$('plan-form').elements.region.value=state.region==='sf'?'sf':'campus';$('plan-dialog').showModal();};
 $('close-plan').onclick=()=>$('plan-dialog').close();
 function planTags(){const names=[...Object.keys(TOPICS),'Hangout'];$('plan-tags').innerHTML=names.map(t=>`<button type="button" data-tag="${escape(t)}" class="chip ${tagSelection.includes(t)?'active':''}">${escape(t)}</button>`).join('');$('plan-tags').querySelectorAll('button').forEach(b=>b.onclick=()=>{const t=b.dataset.tag;tagSelection=tagSelection.includes(t)?tagSelection.filter(x=>x!==t):[...tagSelection,t];planTags();});}
@@ -107,7 +129,7 @@ $('plan-form').onsubmit=async e=>{
     const p=Object.fromEntries(new FormData(e.target));p.start=stanfordTime(p.start);p.end=stanfordTime(p.end);p.tags=tagSelection;p.url=safeURL(p.url);p.free=p.free==='on';p.accessible=p.accessible==='on';
     if(Date.parse(p.end)<=Date.parse(p.start))throw new Error('End time needs to be after start time.');
     if(preview){p.id=crypto.randomUUID();write('wtm-preview-plans',[...read('wtm-preview-plans',[]),p]);}else{await api('plans','POST',p);}
-    $('plan-dialog').close();e.target.reset();tagSelection=[];planTags();$('plan-error').textContent='';state.day=dateKey(p.start);state.source='friends';state.region=p.region||'campus';document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='friends'));dates();await load();toast(preview?'Preview plan saved in this browser.':'Plan posted to the crew.');
+    $('plan-dialog').close();e.target.reset();tagSelection=[];planTags();$('plan-error').textContent='';state.section='discover';state.day=dateKey(p.start);state.source='friends';state.region=p.region||'campus';document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='friends'));dates();await load();toast(preview?'Preview plan saved in this browser.':'Plan posted to the crew.');
   }catch(error){$('plan-error').textContent=error.message;}finally{$('submit-plan').disabled=false;}
 };
 document.querySelectorAll('[data-source]').forEach(b=>b.onclick=()=>{state.source=b.dataset.source;document.querySelectorAll('[data-source]').forEach(x=>x.classList.toggle('active',x===b));render();});
