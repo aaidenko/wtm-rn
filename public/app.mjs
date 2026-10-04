@@ -163,7 +163,7 @@ $('calendar-form').onsubmit=async e=>{
 $('search').oninput=e=>{state.search=e.target.value;render();};
 $('sort').onchange=e=>{state.sort=e.target.value;render();};
 $("filters-panel").open=!matchMedia("(max-width:650px)").matches;
-function updateTimeContext(){const context=timeContext();$('time-context').textContent=context;document.title=`WTM ${context}`;}
+function updateTimeContext(){const context=`${timeContext()}?`;$('time-context').textContent=context;document.title=`WTM ${context}`;}
 updateTimeContext();dates();topics();planTags();load();
 setInterval(()=>{if(ready&&!document.querySelector('dialog[open]'))load();},30000);
 setInterval(()=>{updateTimeContext();const today=dateKey(Date.now());if(today!==state.today){state.today=today;state.day=today;dates();load();}},60000);
