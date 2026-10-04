@@ -3,6 +3,14 @@ import assert from 'node:assert/strict';
 import {validatePlan,parseFeed,collect,validateCalendar} from '../lib/core.mjs';
 import {classify,select,stanfordTime,stanfordLocalTime,planTimes,eventOnDay,dateKey,normalize} from '../public/model.mjs';
 const now=Date.parse('2026-10-03T19:00:00Z');
+test('relevant tag sorting counts matches equally and date sorting uses start time',()=>{
+  const base={free:true,accessible:true,source:'campus',title:'Talk',description:'',location:'Campus',end:'2026-10-05T23:00:00Z'};
+  const events=[{...base,id:'one',topics:['AI'],start:'2026-10-03T22:00:00Z'},{...base,id:'two',topics:['Research','Food & drinks'],start:'2026-10-04T22:00:00Z'}];
+  const filters={now,today:'2026-10-03'};
+  assert.deepEqual(select(events,{...filters,sort:'match'}).map(e=>e.id),['two','one']);
+  assert.deepEqual(select(events,{...filters,sort:'time'}).map(e=>e.id),['one','two']);
+  assert.deepEqual(select(events,{...filters,sort:'match',interests:['AI'],matched:false}).map(e=>e.id),['one','two']);
+});
 test('interest classification avoids AI and CS substrings',()=>{
   assert.deepEqual(classify({title:'Fair paintings and classics'}),[]);
   assert.ok(classify({title:'AI startup founder lunch'}).includes('AI'));

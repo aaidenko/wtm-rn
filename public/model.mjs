@@ -52,7 +52,7 @@ export function select(events,{day='week',today=dateKey(Date.now()),interests=Ob
     return `${e.title} ${e.location} ${e.description}`.toLowerCase().includes(search.toLowerCase());
   }).sort((a,b)=>{
     if(sort==='match'){
-      const score=e=>e.topics.filter(t=>interests.includes(t)).reduce((sum,t)=>sum+(t==='Research'?1:t==='Food & drinks'?2:4),0)+(e.source==='friends'?3:0);
+      const score=e=>e.topics.filter(t=>interests.includes(t)).length;
       const diff=score(b)-score(a);if(diff)return diff;
     }
     return Date.parse(a.start)-Date.parse(b.start);

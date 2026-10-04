@@ -11,7 +11,8 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 ## Browse events
 
 - Discover: browse free events with interest and location filters.
-- Your Moves: shared group saves in Neon, ordered by time. Anyone can save/remove a group move. Names beside each event show who marked Going. Each person can change only their own RSVP; a signed browser identity remembers their chosen name. Names are self reported. Interest filters never hide group moves. Previous private saves can be shared with the import button. The page checks for group changes every 30 seconds.
+- Your Moves: shared group saves in Neon, ordered by time. Tap an outlined star to save for everyone, or a filled star to remove it. Saving keeps the event layout unchanged. Previous private saves can be shared with the import button. Interest filters never hide group moves. The page checks for group changes every 30 seconds.
+- Sort by Relevant tags (number matching selected interests, with date as the tie breaker) or Date (soonest first).
 - List: compact rows, with event details on click.
 - Calendar: seven days, with events ordered by time within each day. Swipe across days on a phone.
 - Cards: images and event descriptions.
@@ -19,7 +20,7 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 - Today, Tomorrow and This week; interest filters, search, free admission enforced across all views, and saved events.
 - Mobile filters collapse to leave more room for events.
 
-Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group events and RSVPs are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
+Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group saves are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
 
 ## Add calendars
 
