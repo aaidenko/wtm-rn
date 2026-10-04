@@ -1,4 +1,5 @@
 import {scanInbox,inboxConfigured} from '../lib/inbox.mjs';
+import {scanCards} from '../lib/cards.mjs';
 import {moveKey,memberName,memberCookie,readMember,mergeGroup} from '../lib/group.mjs';
 import {scanPublicPages,SOURCE_DIRECTORY} from '../lib/sources.mjs';
 import {normalize} from '../public/model.mjs';
@@ -36,15 +37,18 @@ async function refresh(sql) {
   const calendars=await sql`SELECT id,name,url,region FROM calendars ORDER BY id LIMIT 12`;
   const campusPromise=collect(fetch,[]);
   const publicPromise=scanPublicPages();
+  const cardsPromise=scanCards();
   const [oldSnapshot]=await sql`SELECT data FROM snapshots WHERE id=1`;
   const inboxPromise=scanInbox({previousLinks:oldSnapshot?.data?.inbox?.links||[]});
   const scans=Promise.all(calendars.map(async c=>{
     try{const events=await fetchCalendar(c);await sql`UPDATE calendars SET events=${JSON.stringify(events)},updated_at=NOW(),last_error=NULL WHERE id=${c.id}`;}
     catch(e){await sql`UPDATE calendars SET last_error=${e.message} WHERE id=${c.id}`;}
   }));
-  let data;try{data=await campusPromise;}catch(e){await scans;await publicPromise;await inboxPromise;throw e;}
+  let data;try{data=await campusPromise;}catch(e){await scans;await publicPromise;await inboxPromise;await cardsPromise;throw e;}
   await scans;
   const publicSources=await publicPromise;data.external=publicSources.events;data.sourceReports=publicSources.reports;
+  const cards=await cardsPromise;data.external.push(...cards.events);data.sourceReports.push(...cards.reports);
+  if(cards.reports[0]?.last_error)data.external.push(...(oldSnapshot?.data?.external||[]).filter(e=>e.sourceId==='the-cards'&&Date.parse(e.end||e.start)>=Date.now()));
   const inbox=await inboxPromise;data.inbox=inbox;if(inbox.enabled)data.sourceReports.push({id:'wtm-inbox',name:'WTM inbox',updated_at:inbox.updatedAt,last_error:inbox.error});data.external.push(...inbox.events);
   if(inbox.error)data.external.push(...(oldSnapshot?.data?.inbox?.events||[]));
   await sql`INSERT INTO snapshots(id,data,updated_at) VALUES(1,${JSON.stringify(data)},${data.updatedAt}) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at`;
