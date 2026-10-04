@@ -1,3 +1,4 @@
+import {registerPhoton} from '../lib/photon-setup.mjs';
 import {scanInbox,inboxConfigured} from '../lib/inbox.mjs';
 import {scanCards} from '../lib/cards.mjs';
 import {moveKey,memberName,memberCookie,readMember,mergeGroup} from '../lib/group.mjs';
@@ -81,6 +82,10 @@ export default async function handler(req,res) {
     const origin=new URL(req.url,`https://${req.headers.host}`).origin;
     if(req.method==='POST' || req.method==='DELETE') {
       if(req.headers.origin!==origin) return send({error:'Please submit through WTM.'},403);
+    }
+    if(path==='photon-setup'&&req.method==='POST'){
+      if(!process.env.CRON_SECRET||!eq(req.headers.authorization,`Bearer ${process.env.CRON_SECRET}`))return send({error:'Unauthorized'},401);
+      try{return send(await registerPhoton());}catch(e){return send({error:e.message},409);}
     }
     if(path==='refresh' && req.method==='GET') {
       if(!process.env.CRON_SECRET || !eq(req.headers.authorization,`Bearer ${process.env.CRON_SECRET}`)) return send({error:'Unauthorized'},401);
