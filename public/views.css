@@ -17,3 +17,6 @@ header{height:72px}.hero{padding:29px 0 18px}.hero h1{font-size:52px;margin-bott
 
 /* Saving only changes the star; its footprint stays fixed. */
 .row-save{width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;line-height:1;border-radius:50%;padding:0}.save{line-height:1}.row-save:disabled,.save:disabled{opacity:1}.detail-actions .row-save{margin-top:15px}
+
+/* The month spans consecutive weeks; each row shares its tallest day. */
+.calendar-grid{align-items:stretch}.calendar-day:nth-child(7n){border-right:0}.calendar-month .calendar-day{border-bottom:1px solid var(--line);min-height:180px}.calendar-month .calendar-day:nth-child(n+29){border-bottom:0}.calendar-single{grid-template-columns:1fr;min-width:0}.date-tabs{flex-wrap:wrap}.date-tabs button{white-space:nowrap}@media(max-width:650px){.date-tabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.calendar-single{grid-template-columns:1fr;min-width:0}}

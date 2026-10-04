@@ -3,6 +3,7 @@ import {scanCards} from '../lib/cards.mjs';
 import {moveKey,memberName,memberCookie,readMember,mergeGroup} from '../lib/group.mjs';
 import {scanPublicPages,SOURCE_DIRECTORY} from '../lib/sources.mjs';
 import {normalize} from '../public/model.mjs';
+import {admissionCache} from '../lib/admission-cache.mjs';
 import {neon} from '@neondatabase/serverless';
 import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
 import {collect,validatePlan,validateCalendar,fetchCalendar,DEFAULT_CALENDARS} from '../lib/core.mjs';
@@ -35,13 +36,14 @@ async function database() {
 }
 async function refresh(sql) {
   const calendars=await sql`SELECT id,name,url,region FROM calendars ORDER BY id LIMIT 12`;
-  const campusPromise=collect(fetch,[]);
-  const publicPromise=scanPublicPages();
-  const cardsPromise=scanCards();
   const [oldSnapshot]=await sql`SELECT data FROM snapshots WHERE id=1`;
-  const inboxPromise=scanInbox({previousLinks:oldSnapshot?.data?.inbox?.links||[]});
+  const now=Date.now(),cache=admissionCache(oldSnapshot?.data?.admissionCache||[],now);
+  const campusPromise=collect(fetch,[],now,cache);
+  const publicPromise=scanPublicPages(fetch,now,cache);
+  const cardsPromise=scanCards(fetch,now,cache);
+  const inboxPromise=scanInbox({previousLinks:oldSnapshot?.data?.inbox?.links||[],now,cache});
   const scans=Promise.all(calendars.map(async c=>{
-    try{const events=await fetchCalendar(c);await sql`UPDATE calendars SET events=${JSON.stringify(events)},updated_at=NOW(),last_error=NULL WHERE id=${c.id}`;}
+    try{const events=await fetchCalendar(c,fetch,now,cache);await sql`UPDATE calendars SET events=${JSON.stringify(events)},updated_at=NOW(),last_error=NULL WHERE id=${c.id}`;}
     catch(e){await sql`UPDATE calendars SET last_error=${e.message} WHERE id=${c.id}`;}
   }));
   let data;try{data=await campusPromise;}catch(e){await scans;await publicPromise;await inboxPromise;await cardsPromise;throw e;}
@@ -51,6 +53,7 @@ async function refresh(sql) {
   if(cards.reports[0]?.last_error)data.external.push(...(oldSnapshot?.data?.external||[]).filter(e=>e.sourceId==='the-cards'&&Date.parse(e.end||e.start)>=Date.now()));
   const inbox=await inboxPromise;data.inbox=inbox;if(inbox.enabled)data.sourceReports.push({id:'wtm-inbox',name:'WTM inbox',updated_at:inbox.updatedAt,last_error:inbox.error});data.external.push(...inbox.events);
   if(inbox.error)data.external.push(...(oldSnapshot?.data?.inbox?.events||[]));
+  data.baseEvents=normalize(data);data.admissionCache=cache.snapshot();data.scanStats={...cache.stats(),durationMs:Date.now()-now};
   await sql`INSERT INTO snapshots(id,data,updated_at) VALUES(1,${JSON.stringify(data)},${data.updatedAt}) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at`;
   await sql`DELETE FROM plans WHERE "end" < ${new Date(Date.now()-30*86400000).toISOString()}`;
   return data;
@@ -62,7 +65,8 @@ async function eventData(sql){
   const plans=await sql`SELECT * FROM plans WHERE "end" >= NOW() ORDER BY start LIMIT 500`;
   const calendars=await sql`SELECT events,last_error,name FROM calendars ORDER BY id`;
   const external=[...(data.external||[]),...calendars.flatMap(c=>c.events)];
-  return {events:normalize({...data,external,plans}),updatedAt:data.updatedAt,sourceReports:data.sourceReports||[],warnings:[...calendars.filter(c=>c.last_error).map(c=>`${c.name} couldn’t refresh; showing its last saved events.`),...(data.sourceReports||[]).filter(s=>s.last_error).map(s=>`${s.name} scan failed.`)]};
+  const feed=data.baseEvents?{external:[...data.baseEvents,...calendars.flatMap(c=>c.events)],plans}:{...data,external,plans};
+  return {events:normalize(feed),updatedAt:data.updatedAt,sourceReports:data.sourceReports||[],warnings:[...(data.warnings||[]),...calendars.filter(c=>c.last_error).map(c=>`${c.name} couldn’t refresh; showing its last saved events.`),...(data.sourceReports||[]).filter(s=>s.last_error).map(s=>`${s.name} scan failed.`)]};
 }
 export default async function handler(req,res) {
   res.setHeader('Cache-Control','private, no-store');

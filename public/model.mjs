@@ -8,6 +8,9 @@ export const TOPICS={
   'Food & drinks':/\b(food|drinks?|coffee|dinner|lunch|breakfast|brunch|pizza|refreshments|boba|beer|wine|cocktails?|tasting)\b/i
 };
 export const zone='America/Los_Angeles';
+export const SCAN_DAYS=30;
+export function dateDays(start,days){const noon=Date.parse(stanfordTime(start+'T12:00'));return Array.from({length:days},(_,i)=>dateKey(noon+i*86400000));}
+export function horizonEnd(now=Date.now()){return Date.parse(stanfordTime(dateDays(dateKey(now),SCAN_DAYS+1).at(-1)+'T00:00'));}
 export function timeContext(now=Date.now()){
   const hour=Number(new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',hourCycle:'h23'}).format(new Date(now)));
   return hour>=5&&hour<12?'this morning':hour>=12&&hour<17?'this afternoon':'tonight';
@@ -37,12 +40,13 @@ export function normalize(data) {
   return result.filter(e=>e.free===true&&e.accessible===true).filter((e,i,all)=>all.findIndex(x=>x.url&&x.url===e.url&&x.start===e.start)===i||!e.url).map(e=>({...e,topics:classify(e)}));
 }
 export function select(events,{day='week',today=dateKey(Date.now()),interests=Object.keys(TOPICS),matched=true,source='all',region='all',search='',free=false,saved=[],sort='match',now=Date.now()}) {
+  const range=['week','month'].includes(day),lastDay=range?dateDays(today,(day==='month'?SCAN_DAYS:7)+1).at(-1):null;
   return events.filter(e=>{
     if(e.free!==true||e.accessible!==true)return false;
     const eventDay=dateKey(e.start),end=e.end?Date.parse(e.end):Date.parse(e.start)+(e.allDay?86400000:7200000);
     if(end<now && !(e.allDay&&eventDay===today))return false;
-    if(day!=='week'&&!eventOnDay(e,day))return false;
-    if(day==='week'&&(dateKey(Math.max(Date.parse(e.start),end-1))<today||dateKey(e.start)>=dateKey(Date.parse(stanfordTime(today+'T12:00'))+7*86400000)))return false;
+    if(!range&&!eventOnDay(e,day))return false;
+    if(range&&(dateKey(Math.max(Date.parse(e.start),end-1))<today||eventDay>=lastDay))return false;
     if(source==='saved'&&!saved.includes(e.id))return false;
     if(region!=='all'&&(e.region||'campus')!==region)return false;
     if(source==='campus'&&e.source==='friends')return false;

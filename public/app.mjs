@@ -1,4 +1,4 @@
-import {TOPICS,dateKey,zone,normalize,select,eventOnDay,stanfordTime,stanfordLocalTime,planTimes,timeContext,safeURL} from './model.mjs';
+import {TOPICS,dateKey,dateDays,SCAN_DAYS,zone,normalize,select,eventOnDay,stanfordTime,stanfordLocalTime,planTimes,timeContext,safeURL} from './model.mjs';
 const $=id=>document.getElementById(id);
 const preview=new URL(location.href).searchParams.get('preview')==='1'&&['localhost','127.0.0.1'].includes(location.hostname);
 const read=(key,fallback)=>{try{return JSON.parse(localStorage.getItem(key))||fallback;}catch{return fallback;}};
@@ -20,40 +20,40 @@ function topics(){
 }
 function dates(){
   const noon=stanfordTime(state.today+'T12:00');
-  $('dates').innerHTML=[['Today',state.today],['Tomorrow',dateKey(Date.parse(noon)+86400000)],['This week','week']].map(([label,day])=>`<button data-day="${day}" class="${state.day===day?'active':''}">${label}</button>`).join('');
+  $('dates').innerHTML=[['Today',state.today],['Tomorrow',dateKey(Date.parse(noon)+86400000)],['This week','week'],['Next 30 days','month']].map(([label,day])=>`<button data-day="${day}" aria-pressed="${state.day===day}" class="${state.day===day?'active':''}">${label}</button>`).join('');
   $('dates').querySelectorAll('button').forEach(b=>b.onclick=()=>{state.day=b.dataset.day;dates();render();});
 }
 const time=d=>new Intl.DateTimeFormat('en-US',{timeZone:zone,hour:'numeric',minute:'2-digit'}).format(new Date(d));
 const shortDate=d=>new Intl.DateTimeFormat('en-US',{timeZone:zone,weekday:'short',month:'short',day:'numeric'}).format(new Date(d));
 function render(){
   const moving=state.section==='moves';
-  const shortlist=select(events,{saved:state.saved,source:'saved',matched:false,region:'all',sort:'time',today:state.today});
+  const shortlist=select(events,{day:'month',saved:state.saved,source:'saved',matched:false,region:'all',sort:'time',today:state.today});
   $('moves-nav-count').textContent=shortlist.length;
   document.querySelectorAll('[data-section]').forEach(b=>{const active=b.dataset.section===state.section;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   $('moves-note').hidden=!moving;
   $('filters-panel').hidden=moving;
   $('import-saves').hidden=!moving||read('wtm-saves-shared',false)||!events.some(e=>legacySaves.includes(e.id)&&!e.groupSaved);
   const filters=moving?{...state,source:'saved',matched:false,sort:'time'}:state;
-  const list=select(events,state.view==='calendar'?{...filters,day:'week',today:state.day==='week'?state.today:state.day}:filters);
-  $('dates').hidden=state.view==='calendar';
+  const range=['week','month'].includes(state.day),calendarStart=range?state.today:state.day;
+  const list=select(events,filters);
+  $('dates').hidden=false;
   $('sort').hidden=state.view==='calendar';
   document.querySelectorAll('[data-view]').forEach(b=>{const active=b.dataset.view===state.view;b.classList.toggle('active',active);b.setAttribute('aria-pressed',String(active));});
   $('cards').className=state.view==='cards'?'cards':state.view==='calendar'?'calendar':'event-list';
   $('heading').textContent=state.source==='friends'?'Friends’ plans':moving?'Your Moves':state.region==='sf'?'SF events':'Events';
   $('count').textContent=`${list.length} ${list.length===1?'plan':'plans'} · Stanford time`;
-  if(!list.length&&state.view!=='calendar'){$('cards').innerHTML=moving?'<div class="empty"><strong>The group’s next move starts with a ☆.</strong>Star events in Discover to save them here.<br>If you’ve saved something already, try This week or Everywhere.</div>':'<div class="empty"><strong>No moves here yet.</strong>Try This week, clear your search, or adjust your interests.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
+  if(!list.length&&state.view!=='calendar'){$('cards').innerHTML=moving?'<div class="empty"><strong>The group’s next move starts with a ☆.</strong>Star events in Discover to save them here.<br>If you’ve saved something already, try Next 30 days or Everywhere.</div>':'<div class="empty"><strong>No moves here yet.</strong>Try Next 30 days, clear your search, or adjust your interests.<br>Have something in mind? Drop a plan for the crew.</div>';return;}
   if(state.view==='list') {
     $('cards').innerHTML=list.map(e=>`<article class="event-row"><div class="row-when"><strong>${escape(shortDate(e.start))}</strong><span>${escape(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start))}</span></div><button class="row-main" data-detail="${escape(e.id)}"><strong>${escape(e.title)}</strong><span>⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</span></button><div class="row-tags">${e.topics.slice(0,3).map(t=>`<span>${escape(t)}</span>`).join('')}</div><span class="row-source">${escape(e.sourceName||e.source)}${e.approvalRequired?' · Approval':''}</span>${saveButton(e)}${e.source==='friends'?`<button class="remove" data-remove="${escape(e.id)}">Remove</button>`:''}</article>`).join('');
   } else if(state.view==='calendar') {
-    const start=stanfordTime((state.day==='week'?state.today:state.day)+'T12:00');
-    const days=Array.from({length:7},(_,i)=>dateKey(Date.parse(start)+i*86400000));
-    $('cards').innerHTML=`<div class="calendar-scroll"><div class="calendar-grid">${days.map(day=>{
+    const days=dateDays(calendarStart,state.day==='month'?SCAN_DAYS:range?7:1);
+    $('cards').innerHTML=`<div class="calendar-scroll"><div class="calendar-grid ${state.day==='month'?'calendar-month':range?'':'calendar-single'}">${days.map(day=>{
       const entries=list.filter(e=>eventOnDay(e,day)).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
       return `<section class="calendar-day ${day===state.today?'is-today':''}"><div class="calendar-day-heading"><strong>${escape(shortDate(stanfordTime(day+'T12:00')))}</strong><span>${entries.length} ${entries.length===1?'event':'events'}</span></div>${entries.length?entries.map(e=>`<button class="calendar-event topic-${Object.keys(TOPICS).indexOf(e.topics[0])}" data-detail="${escape(e.id)}"><span class="calendar-time">${escape(e.timeTBD?'Time TBD':dateKey(e.start)<day?'Continues'+(e.end&&dateKey(e.end)===day?' · until '+time(e.end):''):e.allDay?'All day':time(e.start))}${e.approvalRequired?' · Approval':''}</span><strong>${escape(e.title)}</strong><span class="calendar-location">${escape(e.location)}</span><span class="calendar-source">${escape(e.sourceName||e.source)}${e.topics[0]?' · '+escape(e.topics[0]):''}</span></button>`).join(''):'<p class="calendar-none">No matching events</p>'}</section>`;
     }).join('')}</div></div><p class="calendar-help">Select an event for details. On your phone, swipe across the days. All times are at Stanford.</p>`;
   } else $('cards').innerHTML=list.map(e=>{
     const matched=e.topics.filter(t=>state.interests.includes(t));
-    const when=(state.day==='week'?shortDate(e.start)+' · ':'')+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+(dateKey(e.start)!==dateKey(e.end)?shortDate(e.end)+' · ':'')+time(e.end):''));
+    const when=(range?shortDate(e.start)+' · ':'')+(e.timeTBD?'Time TBD':e.allDay?'All day':time(e.start)+(e.end?' – '+(dateKey(e.start)!==dateKey(e.end)?shortDate(e.end)+' · ':'')+time(e.end):''));
     const source=e.source==='friends'?'FRIENDS':e.source==='luma'?'LUMA':e.source==='calendar'?'CALENDAR':'STANFORD';
     const link=e.url?`<a href="${escape(e.url)}" target="_blank" rel="noopener noreferrer">${e.source==='friends'?'Event link':e.source==='luma'?'Details & RSVP':'Details & registration'} ↗</a>`:'<span>Ask the host for details</span>';
     return `<article class="card"><div class="card-top ${e.image?'':'placeholder'}">${e.image?`<img src="${escape(e.image)}" alt="" loading="lazy">`:escape(e.source==='friends'?'Your people.':e.topics[0]||'Good plans.')}<span class="source-badge">${source}</span><button class="save" data-save="${escape(e.id)}" aria-label="${state.saved.includes(e.id)?'Remove from group':'Save to group'} ${escape(e.title)}" aria-pressed="${state.saved.includes(e.id)}">${state.saved.includes(e.id)?'★':'☆'}</button></div><div class="card-body"><div class="when">${escape(when)}</div><h3>${escape(e.title)}</h3><div class="location">⌖ ${escape(e.location)}${e.source==='friends'?' · '+escape(e.host):''}</div><p class="description">${escape(e.description.slice(0,175))}${e.description.length>175?'…':''}</p><div class="tags" aria-label="Matching interests">${(matched.length?matched:e.topics).map(t=>`<span>${escape(t)}</span>`).join('')}${e.source==='friends'&&!e.topics.length?'<span>Hangout</span>':''}</div><div class="card-bottom">${link}<span class="price">${e.free?'Free entry':escape(e.price||'Cost not listed')}</span></div>${e.source==='friends'?`<div class="card-bottom"><span>Shared by ${escape(e.host)}</span><button class="remove" data-remove="${escape(e.id)}">Remove plan</button></div>`:''}</div></article>`;
@@ -66,7 +66,7 @@ function render(){
   });
 }
 function setSection(section){
-  state.section=section;state.day='week';state.search='';$('search').value='';state.region=section==='moves'?'all':'campus';state.source='all';
+  state.section=section;state.day=section==='moves'?'month':'week';state.search='';$('search').value='';state.region=section==='moves'?'all':'campus';state.source='all';
   document.querySelectorAll('[data-region]').forEach(b=>b.classList.toggle('active',b.dataset.region===state.region));
   document.querySelectorAll('[data-source]').forEach(b=>b.classList.toggle('active',b.dataset.source==='all'));dates();render();
 }
@@ -106,9 +106,15 @@ function removalConfirmation(){return new Promise(resolve=>{
   dialog.addEventListener('close',()=>resolve(confirmed),{once:true});dialog.showModal();
 });}
 document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{state.view=b.dataset.view;dates();write('wtm-view',state.view);render();});
+let loading=null;
 async function load(){
+  if(loading)await loading;
+  const request=loadFeed();loading=request;
+  try{await request;}finally{if(loading===request)loading=null;}
+}
+async function loadFeed(){
   try {
-    const data=preview?await fetch('preview-data.json').then(r=>r.json()):await api('events');
+    const data=preview?await fetch('preview-data.json?v='+Date.now(),{cache:'no-store'}).then(r=>r.json()):await api('events');
     if(preview){data.plans=read('wtm-preview-plans',[]);$('preview').hidden=false;}
     events=data.events||normalize(data);
     if(preview){const group=read('wtm-preview-group',[]);events=events.map(e=>({...e,groupSaved:group.includes(e.id)}));}
@@ -156,7 +162,7 @@ $('calendar-form').onsubmit=async e=>{
   e.preventDefault();$('submit-calendar').disabled=true;$('calendar-error').textContent='';
   try{const c=Object.fromEntries(new FormData(e.target));
     if(preview){new URL(c.url.replace(/^webcal:\/\//,'https://'));c.id=crypto.randomUUID();write('wtm-preview-calendars',[...read('wtm-preview-calendars',previewCalendars),c]);toast('Preview saved. Production scans the feed when added.');}
-    else{const result=await api('calendars','POST',c);toast(`Calendar added · ${result.count} events in the next week.`);}
+    else{const result=await api('calendars','POST',c);toast(`Calendar added · ${result.count} events in the next 30 days.`);}
     e.target.reset();await calendarSettings();await load();
   }catch(error){$('calendar-error').textContent=error.message;}finally{$('submit-calendar').disabled=false;}
 };
@@ -164,6 +170,8 @@ $('search').oninput=e=>{state.search=e.target.value;render();};
 $('sort').onchange=e=>{state.sort=e.target.value;render();};
 $("filters-panel").open=!matchMedia("(max-width:650px)").matches;
 function updateTimeContext(){const context=`${timeContext()}?`;$('time-context').textContent=context;document.title=`WTM ${context}`;}
+function syncDay(){const today=dateKey(Date.now());if(today===state.today)return false;state.today=today;if(!['week','month'].includes(state.day))state.day=today;dates();return true;}
 updateTimeContext();dates();topics();planTags();load();
-setInterval(()=>{if(ready&&!document.querySelector('dialog[open]'))load();},30000);
-setInterval(()=>{updateTimeContext();const today=dateKey(Date.now());if(today!==state.today){state.today=today;state.day=today;dates();load();}},60000);
+setInterval(()=>{if(ready&&!loading&&!document.hidden&&!document.querySelector('dialog[open]'))load();},30000);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){updateTimeContext();syncDay();if(ready&&!document.querySelector('dialog[open]'))load();}});
+setInterval(()=>{if(document.hidden)return;updateTimeContext();if(syncDay())load();},60000);

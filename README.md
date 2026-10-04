@@ -11,13 +11,13 @@ The group invite code is saved separately in `WTM-access.txt`, outside the proje
 ## Browse events
 
 - Discover: browse free events with interest and location filters.
-- Your Moves: shared group saves in Neon, ordered by time. Tap an outlined star to save for everyone, or a filled star to remove it. Saving keeps the event layout unchanged. Previous private saves can be shared with the import button. Interest filters never hide group moves. The page checks for group changes every 30 seconds.
+- Your Moves: shared group saves in Neon, ordered by time. Tap an outlined star to save for everyone, or a filled star to remove it. Saving keeps the event layout unchanged. Previous private saves can be shared with the import button. Interest filters never hide group moves. The page checks for group changes every 30 seconds while visible, pauses in hidden tabs, and refreshes on returning.
 - Sort by Relevant tags (number matching selected interests, with date as the tie breaker) or Date (soonest first).
 - List: compact rows, with event details on click.
-- Calendar: seven days, with events ordered by time within each day. Swipe across days on a phone.
+- Calendar: a day, seven days or the next 30 days, with events ordered by time within each day. Swipe across days on a phone.
 - Cards: images and event descriptions.
 - Separate Stanford & nearby, SF, and Everywhere categories.
-- Today, Tomorrow and This week; interest filters, search, free admission enforced across all views, and saved events.
+- Today, Tomorrow, This week and Next 30 days; interest filters, search, free admission enforced across all views, and saved events.
 - Mobile filters collapse to leave more room for events.
 
 Interest matching uses keyword rules for startups, trading, CS, AI, research, food and drinks. Group saves are shared; interest preferences are per browser. Only confirmed free admission and student-accessible events appear. Unknown prices stay hidden; free food does not establish free admission. Luma ticket data is checked for an available, non-member free ticket; sold-out/closed registration and restricted audiences are excluded. Host approval is labeled. Friends must confirm no required attendance cost and student access. This is organizer information, not a guarantee that a host will approve an RSVP.
@@ -34,7 +34,7 @@ Stanford and Outlook: copy the calendar's iCal subscription URL.
 
 Use public community calendars. Imported event details are visible to everyone with the group code.
 
-Stanford calendar entries with unknown admission and a student-accessible audience also have their official event page checked for the explicit **Free Event** ticket label. This handles listings whose API free flag disagrees with the website; listed prices are never overridden. Page checks use six workers with a 30-second deadline, and failed checks stay hidden.
+Stanford calendar entries with unknown admission and a student-accessible audience also have their official event page checked for the explicit **Free Event** ticket label. This handles listings whose API free flag disagrees with the website; listed prices are never overridden. Page checks use six workers with a 60-second deadline, and failed checks stay hidden.
 
 Defaults: Stanford's central events calendar; the AI Club speaker host's public Luma calendar (found through the Alfred Lin event); BASES; SAGA's public Google calendar; HAI's department iCal calendar; Stanford xBuilders; and Luma SF Discover. ASES' public website is checked daily for linked Luma events. AI Club events by other hosts may require adding another calendar or an event link. HAI and SAGA items with no admission evidence remain hidden until confirmed. Stanford xBuilders had no upcoming events when checked on October 3, 2026. Luma's SF Discover feed can include nearby Bay Area events; SF is the feed category, not a guarantee that every venue is within city limits.
 
@@ -83,7 +83,7 @@ Friend plans can span multiple days within the next 90 days. Their end must be a
 
 Vercel runs `/api/refresh` once daily at 14:17 UTC: 7:17 a.m. PDT / 6:17 a.m. PST. On Hobby, invocation can occur anywhere within that hour. The job runs on the production deployment, independently of your computer.
 
-The importer fetches every Stanford page for the coming week and each configured feed, then reads public Luma event pages to verify ticket cost, availability and restrictions. Six workers and a bounded deadline keep those checks within the function limit. Calendar settings and event snapshots persist in Neon. A failed feed keeps its last successful events and shows a warning. Stanford refreshes older than 30 hours are marked overdue. A new calendar scans immediately. Old friend plans are cleaned up after 30 days.
+The importer fetches every Stanford page for the next 30 days and each configured feed, then reads public Luma event pages to verify ticket cost, availability and restrictions. Six workers and a bounded deadline keep those checks within the function limit. Calendar settings and event snapshots persist in Neon. A failed feed keeps its last successful events and shows a warning. Stanford refreshes older than 30 hours are marked overdue. A new calendar scans immediately. Old friend plans are cleaned up after 30 days.
 
 Organizers remain the source of truth for event changes, availability, registration and admission. Follow the event link before attending.
 
@@ -100,3 +100,5 @@ A local preview is available by serving `public` and opening `?preview=1` on loc
 Free plans have usage caps and can interrupt service at their limits. This app is intended for a small personal group. No paid services were selected during setup.
 
 References: [Stanford API](https://events-help.stanford.edu/programmatic-connections), [Luma feeds](https://help.luma.com/p/ical-syncing), [Vercel daily job limits](https://vercel.com/docs/cron-jobs/usage-and-pricing), [Neon on Vercel](https://vercel.com/marketplace/neon).
+
+Admission checks persist as public metadata in Neon. Events more than three days away reuse checks for up to 72 hours; events within three days reuse for at most 20 hours and are therefore rechecked by each daily scan. Luma ticket validity windows are evaluated again when cached data is used, and changing feed start dates invalidate that check. Failed checks are not cached; expired checks never establish free admission. The cache holds at most 1,200 entries and does not contain raw emails or credentials. Feed scans still run daily, with a 180-second function limit on the project’s enabled Fluid Compute. Stanford pagination is bounded to 50 pages, downloaded six at a time. The scan precomputes its campus/website event list for subsequent feed reads; group saves and friend plans remain live database reads.

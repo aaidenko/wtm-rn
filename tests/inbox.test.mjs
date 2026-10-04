@@ -17,7 +17,7 @@ test('mailbox reads are bounded, read-only and do not expose email content',asyn
   async fetchOne(uid,q){assert.equal(q.source.maxLength,262144);return uid===2?{size:400000,source:Buffer.from('too big')}:{size:150,source:Buffer.from('From: friend@example.com\r\nSubject: Private announcement\r\nContent-Type: text/plain\r\n\r\nRSVP https://luma.com/ai-talk')};}
   async logout(){} close(){}
  }
- const d={event:{api_id:'evt-test',url:'ai-talk',name:'AI talk',start_at:'2026-10-06T00:30:00Z',end_at:'2026-10-06T01:30:00Z',visibility:'public'},ticket_info:{is_free:true},ticket_types:[{type:'free',cents:null}],registration_availability:'open',description_mirror:{type:'doc',content:[]}};
+ const d={event:{api_id:'evt-test',url:'ai-talk',name:'AI talk',start_at:'2026-10-20T00:30:00Z',end_at:'2026-10-20T01:30:00Z',visibility:'public'},ticket_info:{is_free:true},ticket_types:[{type:'free',cents:null}],registration_availability:'open',description_mirror:{type:'doc',content:[]}};
  const html=`<script id="__NEXT_DATA__">${JSON.stringify({props:{pageProps:{initialData:{kind:'event',data:d}}}})}</script>`;
  const result=await scanInbox({env:{WTM_INBOX_EMAIL:'dedicated@gmail.com',WTM_INBOX_APP_PASSWORD:'dummy'},now:Date.parse('2026-10-04T07:00:00Z'),Client,fetcher:async()=>new Response(html)});
  assert.equal(calls[0].host,'imap.gmail.com');assert.equal(calls[0].secure,true);assert.equal(calls[0].logger,false);assert.deepEqual(calls[1],{path:'INBOX',readOnly:true});
