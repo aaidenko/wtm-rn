@@ -5,12 +5,12 @@ import {scanPublicPages,SOURCE_DIRECTORY} from '../lib/sources.mjs';
 import {normalize} from '../public/model.mjs';
 import {admissionCache} from '../lib/admission-cache.mjs';
 import {neon} from '@neondatabase/serverless';
-import {createHash,randomUUID,timingSafeEqual} from 'node:crypto';
+import {createHash,randomUUID,randomBytes,timingSafeEqual} from 'node:crypto';
 import {collect,validatePlan,validateCalendar,fetchCalendar,DEFAULT_CALENDARS} from '../lib/core.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 const eq=(a,b)=>typeof a==='string'&&typeof b==='string'&&Buffer.byteLength(a)===Buffer.byteLength(b)&&timingSafeEqual(Buffer.from(a),Buffer.from(b));
 let initialized=false;
-async function database() {
+export async function database() {
   const sql=neon(process.env.DATABASE_URL);
   if(!initialized) {
     await sql`CREATE TABLE IF NOT EXISTS snapshots (id INTEGER PRIMARY KEY, data JSONB NOT NULL, updated_at TIMESTAMPTZ NOT NULL)`;
@@ -22,6 +22,9 @@ async function database() {
     await sql`CREATE TABLE IF NOT EXISTS members (id TEXT PRIMARY KEY,name TEXT NOT NULL,name_key TEXT UNIQUE NOT NULL)`;
     await sql`CREATE TABLE IF NOT EXISTS group_moves (event_key TEXT PRIMARY KEY,event JSONB NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
     await sql`CREATE TABLE IF NOT EXISTS attendees (event_key TEXT NOT NULL REFERENCES group_moves(event_key) ON DELETE CASCADE,member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,PRIMARY KEY(event_key,member_id))`;
+    await sql`CREATE TABLE IF NOT EXISTS agent_links (sender_key TEXT PRIMARY KEY,member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,last_results JSONB NOT NULL DEFAULT '[]',busy_until TIMESTAMPTZ)`;
+    await sql`CREATE TABLE IF NOT EXISTS agent_pairings (code_hash TEXT PRIMARY KEY,member_id TEXT NOT NULL REFERENCES members(id) ON DELETE CASCADE,expires_at TIMESTAMPTZ NOT NULL)`;
+    await sql`CREATE TABLE IF NOT EXISTS agent_jobs (id TEXT PRIMARY KEY,sender_key TEXT NOT NULL,payload JSONB NOT NULL,reply TEXT,last_results JSONB,status TEXT NOT NULL DEFAULT 'pending',created_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`;
     await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY,value TEXT NOT NULL)`;
     const [seed]=await sql`SELECT value FROM settings WHERE key='club_sources_v2'`;
     if(!seed){
@@ -55,10 +58,12 @@ async function refresh(sql) {
   if(inbox.error)data.external.push(...(oldSnapshot?.data?.inbox?.events||[]));
   data.baseEvents=normalize(data);data.admissionCache=cache.snapshot();data.scanStats={...cache.stats(),durationMs:Date.now()-now};
   await sql`INSERT INTO snapshots(id,data,updated_at) VALUES(1,${JSON.stringify(data)},${data.updatedAt}) ON CONFLICT(id) DO UPDATE SET data=EXCLUDED.data,updated_at=EXCLUDED.updated_at`;
+  await sql`DELETE FROM agent_jobs WHERE created_at < NOW()-INTERVAL '7 days'`;
+  await sql`DELETE FROM agent_pairings WHERE expires_at < NOW()`;
   await sql`DELETE FROM plans WHERE "end" < ${new Date(Date.now()-30*86400000).toISOString()}`;
   return data;
 }
-async function eventData(sql){
+export async function eventData(sql){
   const [row]=await sql`SELECT data FROM snapshots WHERE id=1`;
   let data=row?.data;
   if(!data){try{data=await refresh(sql);}catch{data={pages:[],external:[],updatedAt:null};}}
@@ -80,7 +85,7 @@ export default async function handler(req,res) {
     if(path==='refresh' && req.method==='GET') {
       if(!process.env.CRON_SECRET || !eq(req.headers.authorization,`Bearer ${process.env.CRON_SECRET}`)) return send({error:'Unauthorized'},401);
       if(!process.env.DATABASE_URL) return send({error:'Connect a free Neon database in Vercel Storage.'},503);
-      const data=await refresh(await database());return send({ok:true,updatedAt:data.updatedAt,warnings:data.warnings});
+      const data=await refresh(await database());if(process.env.SPECTRUM_PROJECT_ID){const {recoverAgent}=await import('../lib/agent-service.mjs');await recoverAgent();}return send({ok:true,updatedAt:data.updatedAt,warnings:data.warnings});
     }
     const code=process.env.GROUP_CODE;
     if(!code || code.length<8) return send({error:'The owner needs to set GROUP_CODE in Vercel (at least 8 characters).'},503);
@@ -101,6 +106,21 @@ export default async function handler(req,res) {
       if(taken&&taken.id!==id)return send({error:'That name is already being used. Add your last name or an initial.'},409);
       await sql`INSERT INTO members(id,name,name_key) VALUES(${id},${name},${name.toLowerCase()}) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,name_key=EXCLUDED.name_key`;
       res.setHeader('Set-Cookie',memberCookie(id,code));return send({name});
+    }
+    if(path==='agent-link'&&req.method==='GET'){
+      const linked=currentMember?await sql`SELECT sender_key FROM agent_links WHERE member_id=${currentMember}`:[];
+      return send({configured:!!(process.env.SPECTRUM_PROJECT_ID&&process.env.SPECTRUM_PROJECT_SECRET&&process.env.SPECTRUM_WEBHOOK_SECRET),linked:linked.length>0});
+    }
+    if(path==='agent-link'&&req.method==='POST'){
+      if(!currentMember)return send({error:'Add your name first.'},409);
+      const [member]=await sql`SELECT id FROM members WHERE id=${currentMember}`;if(!member)return send({error:'Add your name first.'},409);
+      const pairingCode=randomBytes(6).toString('hex').toUpperCase(),expiresAt=new Date(Date.now()+10*60000).toISOString();
+      await sql.transaction([sql`DELETE FROM agent_pairings WHERE member_id=${currentMember} OR expires_at<NOW()`,sql`INSERT INTO agent_pairings(code_hash,member_id,expires_at) VALUES(${hash(pairingCode)},${currentMember},${expiresAt})`]);
+      return send({command:'link '+pairingCode,expiresAt});
+    }
+    if(path==='agent-link'&&req.method==='DELETE'){
+      if(currentMember)await sql.transaction([sql`DELETE FROM agent_links WHERE member_id=${currentMember}`,sql`DELETE FROM agent_pairings WHERE member_id=${currentMember}`]);
+      return send({ok:true});
     }
     if(path==='events'&&req.method==='GET'){
       const data=await eventData(sql);
