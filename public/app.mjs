@@ -92,7 +92,8 @@ function showDetail(id){
   $('detail-location').textContent='⌖ '+e.location;
   $('detail-eligibility').textContent='Free admission · '+e.access+' · '+e.freeEvidence;
   $('detail-tags').innerHTML=e.topics.map(t=>`<span>${escape(t)}</span>`).join('');
-  $('detail-description').textContent=e.description||'Ask the host or check the event page for more details.';
+  $('detail-description').textContent=e.description;
+  $('detail-description').hidden=!e.description?.trim();
   $('detail-link').innerHTML=e.url?`<a class="primary detail-rsvp" href="${escape(e.url)}" target="_blank" rel="noopener noreferrer">Event details & RSVP ↗</a>`:'<p>Ask the host for details.</p>';
   const save=$('detail-save');
   const updateSave=()=>{save.textContent=state.saved.includes(id)?'★':'☆';save.setAttribute('aria-label',(state.saved.includes(id)?'Remove from group ':'Save to group ')+e.title);save.setAttribute('aria-pressed',String(state.saved.includes(id)));};
