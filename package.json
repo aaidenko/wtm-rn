@@ -5,7 +5,8 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "deploy": "vercel --prod"
+    "deploy": "vercel --prod",
+    "demo": "node scripts/create-demo.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

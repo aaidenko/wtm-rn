@@ -4,4 +4,13 @@ dist/
 !.env.example
 .vercel/
 public/preview-data.json
-.vercel
+
+# Local exports, backups and operator credentials
+work/
+*.log
+*.db
+*.sqlite*
+*.pem
+*.key
+.DS_Store
+WTM-access.txt
