@@ -5,7 +5,6 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test tests/*.test.mjs",
-    "deploy": "vercel --prod",
     "demo": "node scripts/create-demo.mjs"
   },
   "dependencies": {
@@ -17,9 +16,6 @@
     "imapflow": "^2.2.4",
     "mailparser": "^3.9.34",
     "spectrum-ts": "^12.10.1"
-  },
-  "devDependencies": {
-    "vercel": "latest"
   },
   "engines": {
     "node": "22.x"

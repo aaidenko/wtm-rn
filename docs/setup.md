@@ -89,7 +89,7 @@ Organizers remain the source of truth for event changes, availability, registrat
 
 Required server-only production variables: `DATABASE_URL` (provided by Neon), `GROUP_CODE` (at least 8 characters), and `CRON_SECRET` (separate random secret, at least 32 characters). Never put these in browser code or commit them. The tables initialize automatically on first use.
 
-Deploy the project with Vercel CLI or a Git repository. Framework: Other. Build: `npm run build`. Output: `dist`. The configuration includes the daily job. Stay on Vercel Hobby and Neon Free; do not enable paid upgrades.
+Deploy the project through Vercel's Git integration. Framework: Other. Build: `npm run build`. Output: `dist`. The configuration includes the daily job. The Vercel CLI is intentionally not a project dependency: Git pushes handle deployment without installing the CLI's additional dependency tree. If manual deployment is needed, install and maintain the CLI separately. Stay on Vercel Hobby and Neon Free; do not enable paid upgrades.
 
 Generate fictional events with `npm run demo`. A local preview is available by serving `public` and opening `?preview=1` on localhost. Preview plans and calendar settings stay in that browser; production writes use Neon. Preview data is excluded from the deployment. Source tests cover times, matching, pagination, feed parsing, safe calendar URLs and region filtering.
 
